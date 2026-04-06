@@ -7,6 +7,7 @@ pub struct PredictionMarketPlaceDetails {
     pub total_markets: u64,
     pub total_resolved: u64,
     pub vault: Pubkey,
+    pub vault_bump: u8,
     pub bump: u8,
 }
 

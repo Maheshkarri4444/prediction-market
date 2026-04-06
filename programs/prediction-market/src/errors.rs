@@ -1,0 +1,10 @@
+use anchor_lang::prelude::*;
+
+#[error_code]
+pub enum PredictionMarketPlaceErrors {
+    #[msg("Creator mismatch , Unauthorized!")]
+    CreatorMismatch,
+
+    #[msg("Vault has no funds")]
+    NoFundsInVault,
+}
