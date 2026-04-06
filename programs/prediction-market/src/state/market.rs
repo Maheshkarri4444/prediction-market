@@ -25,19 +25,19 @@ pub struct Market {
     pub question_type: QuestionType,
     pub question: String,
 
-    pub yes_mint: Pubkey,
-    pub no_mint: Pubkey,
+    pub yes_mint: Pubkey, // mint address of yes tokens for this market
+    pub no_mint: Pubkey,  // mint address of no tokens for this market
 
-    pub yes_pool_vault: Pubkey,
-    pub no_pool_vault: Pubkey,
+    pub yes_pool_vault: Pubkey, // vault address of yes tokens for this market
+    pub no_pool_vault: Pubkey,  // vault address of no tokens for this market
 
-    pub yes_virtual_pool_amount: u64,
-    pub no_virtual_pool_amount: u64,
+    pub yes_virtual_pool_amount: u64, // virtual amount (initially 10) , this is used to start the market at 0.5 per either yes/no share
+    pub no_virtual_pool_amount: u64, // virtual amount (initially 10 (to reduce early price volatility and prevent large price swings from small initial trades)) , this is used to start the market at 0.5 per either yes/no share
 
-    pub yes_pool_amount: u64,
-    pub no_pool_amount: u64,
+    pub yes_pool_amount: u64, // amount of sol in yes vault
+    pub no_pool_amount: u64,  // amount of sol in no vault
 
-    pub market_end_time: i64,
+    pub market_end_time: i64, // people can bid upto this time (must be less than target time)
 
     pub resolved: bool,
     pub outcome: Option<bool>,
