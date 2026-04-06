@@ -1,16 +1,20 @@
-import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
-import { PredictionMarket } from "../target/types/prediction_market";
+import fetch from "node-fetch";
 
-describe("prediction-market", () => {
-  // Configure the client to use the local cluster.
-  anchor.setProvider(anchor.AnchorProvider.env());
+it("fetch pyth feeds", async () => {
+  const res = await fetch(
+    "https://hermes.pyth.network/v2/price_feeds?asset_type=crypto"
+  );
 
-  const program = anchor.workspace.predictionMarket as Program<PredictionMarket>;
+  if (!res.ok) {
+    throw new Error(`HTTP error! status: ${res.status}`);
+  }
 
-  it("Is initialized!", async () => {
-    // Add your test here.
-    const tx = await program.methods.initialize().rpc();
-    console.log("Your transaction signature", tx);
-  });
+  const feeds = await res.json();
+
+  for (const feed of feeds) {
+    console.log(
+      "Symbol:", feed.attributes?.symbol,
+      "Feed:", feed.id
+    );
+  }
 });
