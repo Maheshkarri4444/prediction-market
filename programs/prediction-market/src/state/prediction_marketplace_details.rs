@@ -7,8 +7,9 @@ pub struct PredictionMarketPlaceDetails {
     pub total_markets: u64,
     pub total_resolved: u64,
     pub vault: Pubkey,
+    pub bump: u8,
 }
 
 impl PredictionMarketPlaceDetails {
-    pub const LEN: usize = 80;
+    pub const LEN: usize = 81;
 }
