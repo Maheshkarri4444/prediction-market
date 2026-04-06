@@ -20,14 +20,16 @@ pub enum QuestionType {
 pub struct Market {
     pub id: u64,
 
+    pub authority: Pubkey,
+
     pub question_type: QuestionType,
     pub question: String,
 
     pub yes_mint: Pubkey,
     pub no_mint: Pubkey,
 
-    pub yes_pool: Pubkey,
-    pub no_pool: Pubkey,
+    pub yes_pool_vault: Pubkey,
+    pub no_pool_vault: Pubkey,
 
     pub yes_virtual_pool_amount: u64,
     pub no_virtual_pool_amount: u64,
@@ -40,9 +42,11 @@ pub struct Market {
     pub resolved: bool,
     pub outcome: Option<bool>,
 
+    pub yes_pool_vault_bump: u8,
+    pub no_pool_vault_bump: u8,
     pub bump: u8,
 }
 
 impl Market {
-    pub const LEN: usize = 245 + MAX_STRING as usize;
+    pub const LEN: usize = 279 + MAX_STRING as usize;
 }
