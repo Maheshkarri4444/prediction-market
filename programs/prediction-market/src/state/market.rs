@@ -37,7 +37,7 @@ pub struct Market {
     pub yes_pool_amount: u64,
     pub no_pool_amount: u64,
 
-    pub market_end_time: u64,
+    pub market_end_time: i64,
 
     pub resolved: bool,
     pub outcome: Option<bool>,

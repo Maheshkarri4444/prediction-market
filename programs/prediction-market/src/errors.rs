@@ -7,4 +7,7 @@ pub enum PredictionMarketPlaceErrors {
 
     #[msg("Vault has no funds")]
     NoFundsInVault,
+
+    #[msg("length too long")]
+    LengthTooLong,
 }
