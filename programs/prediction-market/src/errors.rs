@@ -10,4 +10,7 @@ pub enum PredictionMarketPlaceErrors {
 
     #[msg("length too long")]
     LengthTooLong,
+
+    #[msg("Insufficent funds for Creation Fee")]
+    InsufficientFundsForCreationFee,
 }

@@ -1,8 +1,7 @@
 use crate::{
-    market::Market, PredictionMarketPlaceDetails, PredictionMarketPlaceErrors, QuestionType,
-    MAX_STRING,
+    CREATION_FEE, MAX_STRING, PredictionMarketPlaceDetails, PredictionMarketPlaceErrors, QuestionType, market::Market
 };
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, system_program::Transfer};
 use anchor_spl::{associated_token::spl_associated_token_account::solana_program::native_token::{LAMPORTS_PER_SOL, Sol}, token::*};
 
 #[derive(Accounts)]
@@ -83,12 +82,28 @@ pub fn create_market(
     market_end_time: i64,
 ) -> Result<()> {
     let market = &mut ctx.accounts.market;
+    let prediction_market_vault = &mut ctx.accounts.prediction_market_vault;
     let prediction_market = &mut ctx.accounts.prediction_market_place;
 
     require!(
         question.len() <= MAX_STRING,
         PredictionMarketPlaceErrors::LengthTooLong
     );
+
+    require!(
+        ctx.accounts.creator.lamports() >= CREATION_FEE, PredictionMarketPlaceErrors::InsufficientFundsForCreationFee
+    );
+
+    anchor_lang::system_program::transfer(
+        CpiContext::new(
+            ctx.accounts.system_program.to_account_info(), 
+            Transfer { 
+                from: ctx.accounts.creator.to_account_info(), 
+                to: prediction_market_vault.to_account_info() 
+            }
+        ), 
+    CREATION_FEE
+    )?;
 
     market.id = prediction_market.total_markets + 1 as u64;
     market.authority = ctx.accounts.creator.key();
