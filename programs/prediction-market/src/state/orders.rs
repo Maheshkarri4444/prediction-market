@@ -7,7 +7,7 @@ pub enum Options {
 }
 
 #[account]
-pub struct BuyShares {
+pub struct Order {
     pub buyer: Pubkey,
 
     pub market: Pubkey,
@@ -15,9 +15,11 @@ pub struct BuyShares {
 
     pub quantity: u64,
 
-    pub time: i64,
+    pub token_account: Pubkey,
+
+    pub time_stamp: i64,
 }
 
-impl BuyShares {
+impl Order {
     pub const LEN: usize = 81;
 }
