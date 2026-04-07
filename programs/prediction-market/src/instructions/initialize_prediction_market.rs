@@ -66,7 +66,6 @@ pub struct ClaimFunds<'info> {
 }
 
 pub fn claim_funds(ctx: Context<ClaimFunds>)-> Result<()> {
-    let prediction_marketplace_vault = &mut ctx.accounts.prediction_market_place_vault;
     let prediction_marketplace = &mut ctx.accounts.prediction_market_place;
     require!(ctx.accounts.creator.key() == prediction_marketplace.creator , PredictionMarketPlaceErrors::CreatorMismatch );
 

@@ -132,5 +132,6 @@ pub fn create_market(
 
     market.bump = ctx.bumps.market;
 
+    prediction_market.total_markets += 1 as u64;
     Ok(())
 }
