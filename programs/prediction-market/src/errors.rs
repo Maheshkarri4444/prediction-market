@@ -16,4 +16,16 @@ pub enum PredictionMarketPlaceErrors {
 
     #[msg("Username too long")]
     UsernameTooLong,
+
+    #[msg("Pool vault mismatch")]
+    PoolVaultMismatch,
+
+    #[msg("Selected pool amount should be less than total pool")]
+    InvalidValues,
+
+    #[msg("Math overflow")]
+    MathOverflow,
+
+    #[msg("Insufficient Funds to make this order")]
+    InsufficientFundsForOrder,
 }
