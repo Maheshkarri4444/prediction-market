@@ -1,5 +1,5 @@
 use crate::{
-    CREATION_FEE, MAX_STRING, PredictionMarketPlaceDetails, PredictionMarketPlaceErrors, QuestionType, market::Market
+    CREATION_FEE, MAX_STRING, PredictionMarketPlaceDetails, PredictionMarketPlaceErrors, QuestionType, RESOLVE_REWARD, market::Market, prediction_marketplace_details
 };
 use anchor_lang::{prelude::*, system_program::Transfer};
 use anchor_spl::{associated_token::spl_associated_token_account::solana_program::native_token::{LAMPORTS_PER_SOL, Sol}, token::*};
@@ -168,5 +168,26 @@ pub struct ResolveMarket<'info> {
 
 pub fn resolve_market(ctx:Context<ResolveMarket>)-> Result<()> {
     let market = &mut ctx.accounts.market;
+    let clock = Clock::get()?;
+    let prediction_market_vault = &mut ctx.accounts.prediction_marketplace_vault;
+    let prediction_market = &mut ctx.accounts.prediction_marketplace;
+
+    require!(market.market_end_time <= clock.unix_timestamp , PredictionMarketPlaceErrors::MarketEndtimeNotReached);
+    require!(prediction_market_vault.lamports()>= RESOLVE_REWARD,PredictionMarketPlaceErrors::InsufficientFundsInTreasury);
+
+    {
+        let prediction_vault_info = prediction_market_vault.to_account_info();
+        let resolver_info = ctx.accounts.resolver.to_account_info();
+
+        let mut prediction_vault_lamports = prediction_vault_info.try_borrow_mut_lamports()?;
+        let mut resolver_lamports = resolver_info.try_borrow_mut_lamports()?;
+
+        **prediction_vault_lamports = (**prediction_vault_lamports).checked_sub(RESOLVE_REWARD).ok_or(PredictionMarketPlaceErrors::FundTransferError)?;
+        **resolver_lamports = (**resolver_lamports).checked_add(RESOLVE_REWARD).ok_or(PredictionMarketPlaceErrors::FundTransferError)?;
+    }
+
+    market.resolved = true;
+    prediction_market.total_resolved += 1 as u64;
+
     Ok(())
 }

@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{PredictionMarketPlaceDetails, prediction_marketplace_details};
+use crate::{PredictionMarketPlaceDetails, RESOLVE_REWARD, prediction_marketplace_details};
 use crate::errors::PredictionMarketPlaceErrors;
 
 #[derive(Accounts)]
@@ -69,18 +69,26 @@ pub fn claim_funds(ctx: Context<ClaimFunds>)-> Result<()> {
     let prediction_marketplace = &mut ctx.accounts.prediction_market_place;
     require!(ctx.accounts.creator.key() == prediction_marketplace.creator , PredictionMarketPlaceErrors::CreatorMismatch );
 
+    let total_markets = prediction_marketplace.total_markets;
+    let total_resolved = prediction_marketplace.total_resolved;
+
+    let resolved_amount = (total_markets as u64 - total_resolved).checked_mul(RESOLVE_REWARD as u64).unwrap();
+
     {
         let vault_info = ctx.accounts.prediction_market_place_vault.to_account_info();
         let creator_info = ctx.accounts.creator.to_account_info();
 
         let mut vault_lamports = vault_info.try_borrow_mut_lamports()?;
         let amount = **vault_lamports;
+        require!(amount != 0 , PredictionMarketPlaceErrors::NoFundsInVault);
+        let out_funds = amount - resolved_amount as u64;
+        require!(out_funds <= amount,PredictionMarketPlaceErrors::InsufficientFundsInTreasury);
+
         let mut creator_lamports = creator_info.try_borrow_mut_lamports()?;
 
-        require!(amount != 0 , PredictionMarketPlaceErrors::NoFundsInVault);
 
-        **vault_lamports = (**vault_lamports).checked_sub(amount).unwrap();
-        **creator_lamports = (**creator_lamports).checked_add(amount).unwrap();
+        **vault_lamports = (**vault_lamports).checked_sub(out_funds).unwrap();
+        **creator_lamports = (**creator_lamports).checked_add(out_funds).unwrap();
 
     }
 

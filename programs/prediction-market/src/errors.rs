@@ -29,6 +29,15 @@ pub enum PredictionMarketPlaceErrors {
     #[msg("Insufficient Funds to make this order")]
     InsufficientFundsForOrder,
 
-    #[msg("Marked endtime reached")]
+    #[msg("Market endtime reached")]
     MarketClosed,
+
+    #[msg("Market Endtime not yet reached")]
+    MarketEndtimeNotReached,
+
+    #[msg("Fund transfer Error")]
+    FundTransferError,
+
+    #[msg("Insufficient Funds in prediction market treasury")]
+    InsufficientFundsInTreasury,
 }
