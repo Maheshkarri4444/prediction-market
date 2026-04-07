@@ -165,7 +165,7 @@ pub fn create_order(ctx: Context<CreateOrder>, option: Options, quantity: u64) -
         &authority_info,
         &ctx.accounts.token_program,
         signer_seeds,
-        required_amount,
+        quantity,
     )?;
 
     order.buyer = ctx.accounts.buyer.key();

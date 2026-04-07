@@ -135,3 +135,38 @@ pub fn create_market(
     prediction_market.total_markets += 1 as u64;
     Ok(())
 }
+
+
+#[derive(Accounts)]
+pub struct ResolveMarket<'info> {
+    #[account(mut)]
+    pub resolver: Signer<'info>,
+
+    #[account(
+        mut,
+        seeds=[b"market" , market.authority.as_ref() , &market.id.to_le_bytes()],
+        bump = market.bump,
+    )]
+    pub market: Account<'info , Market>,
+
+    #[account(
+        mut,
+        seeds = [b"predictionmarketplace"],
+        bump = prediction_marketplace.bump,
+    )]
+    pub prediction_marketplace: Account<'info , PredictionMarketPlaceDetails>,
+
+
+    /// CHECK: prediction market vault
+    #[account(
+        mut,
+        seeds = [b"predictionmarketplace_vault", prediction_marketplace.key().as_ref()],
+        bump = prediction_marketplace.vault_bump ,
+    )]
+    pub prediction_marketplace_vault: UncheckedAccount<'info>,
+}
+
+pub fn resolve_market(ctx:Context<ResolveMarket>)-> Result<()> {
+    let market = &mut ctx.accounts.market;
+    Ok(())
+}
