@@ -4,7 +4,7 @@ use anchor_spl::{
     token::{Mint, Token, TokenAccount},
 };
 
-use crate::calculate_price;
+use crate::{calculate_price, mint_tokens};
 use crate::{Market, Options, Order, PredictionMarketPlaceErrors, User};
 #[derive(Accounts)]
 pub struct CreateOrder<'info> {
@@ -91,6 +91,11 @@ pub fn create_order(ctx: Context<CreateOrder>, option: Options, quantity: u64) -
     let clock = Clock::get()?;
 
     require!(
+        clock.unix_timestamp < market.market_end_time,
+        PredictionMarketPlaceErrors::MarketClosed
+    );
+
+    require!(
         yes_pool_vault.key() == market.yes_pool_vault,
         PredictionMarketPlaceErrors::PoolVaultMismatch
     );
@@ -98,6 +103,7 @@ pub fn create_order(ctx: Context<CreateOrder>, option: Options, quantity: u64) -
         no_pool_vault.key() == market.no_pool_vault,
         PredictionMarketPlaceErrors::PoolVaultMismatch
     );
+
     let selected_pool = if option == Options::Yes {
         yes_pool_vault.lamports() as u64 + market.yes_virtual_pool_amount as u64
     } else {
@@ -116,6 +122,18 @@ pub fn create_order(ctx: Context<CreateOrder>, option: Options, quantity: u64) -
     } else {
         no_pool_vault
     };
+    let selected_mint = if option == Options::Yes {
+        &ctx.accounts.yes_token_mint
+    } else {
+        &ctx.accounts.no_token_mint
+    };
+    let selected_to_token_account = if option == Options::Yes {
+        &ctx.accounts.yes_token_account
+    } else {
+        &ctx.accounts.no_token_account
+    };
+
+    let authority_info = market.to_account_info();
 
     require!(
         ctx.accounts.buyer.lamports() >= required_amount,
@@ -130,6 +148,23 @@ pub fn create_order(ctx: Context<CreateOrder>, option: Options, quantity: u64) -
                 to: selected_vault.to_account_info(),
             },
         ),
+        required_amount,
+    )?;
+
+    let signer: &[&[u8]] = &[
+        b"market",
+        market.authority.as_ref(),
+        &market.id.to_le_bytes(),
+        &[market.bump],
+    ];
+
+    let signer_seeds = &[signer];
+    mint_tokens(
+        selected_mint,
+        selected_to_token_account,
+        &authority_info,
+        &ctx.accounts.token_program,
+        signer_seeds,
         required_amount,
     )?;
 
