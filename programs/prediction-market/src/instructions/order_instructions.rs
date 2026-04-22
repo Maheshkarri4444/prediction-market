@@ -27,7 +27,7 @@ pub struct CreateOrder<'info> {
 
     #[account(
         mut,
-        address= market.yes_mint,
+        address = market.yes_mint,
     )]
     pub yes_token_mint: Account<'info, Mint>,
 
@@ -41,7 +41,7 @@ pub struct CreateOrder<'info> {
         init,
         payer = buyer,
         space = Order::LEN,
-        seeds = [b"buy_shares", market.key().as_ref(), &(user.total_interactions + 1).to_be_bytes()],
+        seeds = [b"buy_shares", market.key().as_ref(), &(user.total_orders + 1).to_be_bytes()],
         bump
     )]
     pub order: Account<'info, Order>,
@@ -151,6 +151,18 @@ pub fn create_order(ctx: Context<CreateOrder>, option: Options, quantity: u64) -
         required_amount,
     )?;
 
+    if option == Options::Yes {
+        market.yes_pool_amount = market
+            .yes_pool_amount
+            .checked_add(required_amount)
+            .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+    } else {
+        market.no_pool_amount = market
+            .no_pool_amount
+            .checked_add(required_amount)
+            .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+    }
+
     let signer: &[&[u8]] = &[
         b"market",
         market.authority.as_ref(),
@@ -182,5 +194,144 @@ pub fn create_order(ctx: Context<CreateOrder>, option: Options, quantity: u64) -
 
     order.time_stamp = clock.unix_timestamp as i64;
 
+    Ok(())
+}
+
+// next task claim winning reward.
+#[derive(Accounts)]
+pub struct ClaimWinningReward<'info> {
+    #[account(mut)]
+    pub user: Signer<'info>,
+
+    #[account(
+        mut,
+        seeds=[b"market" , market.authority.as_ref() , &market.id.to_le_bytes()],
+        bump = market.bump,
+    )]
+    pub market: Account<'info, Market>,
+
+    #[account(
+        mut,
+        address= market.yes_mint,
+    )]
+    pub yes_token_mint: Account<'info, Mint>,
+
+    #[account(
+        mut,
+        address = market.no_mint,
+    )]
+    pub no_token_mint: Account<'info, Mint>,
+
+    /// CHECK: yes pool vault for this market.
+    #[account(
+        mut,
+        seeds = [b"yes_token_vault",market.key().as_ref(),yes_token_mint.key().as_ref()],
+        bump = market.yes_pool_vault_bump,
+    )]
+    pub yes_pool_vault: UncheckedAccount<'info>,
+
+    /// CHECK: no pool vault for this market.
+    #[account(
+        mut,
+        seeds = [b"no_token_vault",market.key().as_ref(),no_token_mint.key().as_ref()],
+        bump = market.no_pool_vault_bump,
+    )]
+    pub no_pool_vault: UncheckedAccount<'info>,
+
+    #[account(
+        associated_token::mint = yes_token_mint,
+        associated_token::authority = user,
+    )]
+    pub yes_token_account: Account<'info, TokenAccount>,
+
+    #[account(
+        associated_token::mint = no_token_mint,
+        associated_token::authority = user,
+    )]
+    pub no_token_account: Account<'info, TokenAccount>,
+
+    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+}
+
+pub fn claim_winning_reward(ctx: Context<CreateOrder>) -> Result<()> {
+    let market = &mut ctx.accounts.market;
+    let yes_token_mint = &mut ctx.accounts.yes_token_mint;
+    let no_token_mint = &mut ctx.accounts.no_token_mint;
+    let yes_token_account = &mut ctx.accounts.yes_token_account;
+    let no_token_account = &mut ctx.accounts.no_token_account;
+
+    let yes_vault = &mut ctx.accounts.yes_pool_vault;
+    let no_vault = &mut ctx.accounts.no_pool_vault;
+
+    require!(
+        market.resolved,
+        PredictionMarketPlaceErrors::MarketNotYetResolved
+    );
+    require!(
+        market.outcome.is_some(),
+        PredictionMarketPlaceErrors::NoOutcome
+    );
+    let total_yes_tokens = yes_token_mint.supply;
+    let total_no_tokens = no_token_mint.supply;
+
+    let no_vault_account_info = no_vault.to_account_info();
+    let yes_vault_account_info = yes_vault.to_account_info();
+
+    let no_vault_funds = no_vault.lamports();
+    let yes_vault_funds = yes_vault.lamports();
+
+    if let Some(outcome) = market.outcome {
+        let user_account_info = ctx.accounts.user.to_account_info();
+        let mut user_lamports = user_account_info.try_borrow_mut_lamports()?;
+        if outcome {
+            let user_yes_tokens = yes_token_account.amount;
+            let user_reward = user_yes_tokens
+                .checked_mul(market.yes_pool_amount + market.no_pool_amount as u64)
+                .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
+                .checked_div(total_yes_tokens)
+                .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+
+            {
+                let mut yes_vault_lamports = yes_vault_account_info.try_borrow_mut_lamports()?;
+                let mut no_vault_lamports = no_vault_account_info.try_borrow_mut_lamports()?;
+
+                if **no_vault_lamports != 0 {
+                    **no_vault_lamports =
+                        (**no_vault_lamports).checked_sub(no_vault_funds).unwrap();
+                    **yes_vault_lamports =
+                        (**yes_vault_lamports).checked_add(no_vault_funds).unwrap();
+                }
+                **yes_vault_lamports = (**yes_vault_lamports).checked_sub(user_reward).unwrap();
+                **user_lamports = (**user_lamports).checked_add(user_reward).unwrap();
+            }
+        } else {
+            let user_no_tokens = no_token_account.amount;
+            let user_reward = user_no_tokens
+                .checked_mul(market.no_pool_amount + market.yes_pool_amount as u64)
+                .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
+                .checked_div(total_no_tokens)
+                .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+            {
+                let mut yes_vault_lamports = yes_vault_account_info.try_borrow_mut_lamports()?;
+                let mut no_vault_lamports = no_vault_account_info.try_borrow_mut_lamports()?;
+
+                if **yes_vault_lamports != 0 {
+                    **yes_vault_lamports =
+                        (**yes_vault_lamports).checked_sub(yes_vault_funds).unwrap();
+                    **no_vault_lamports =
+                        (**no_vault_lamports).checked_add(yes_vault_funds).unwrap();
+                }
+
+                **no_vault_lamports = (**no_vault_lamports)
+                    .checked_sub(user_reward)
+                    .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+                **user_lamports = (**user_lamports)
+                    .checked_add(user_reward)
+                    .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+            }
+        }
+    }
     Ok(())
 }

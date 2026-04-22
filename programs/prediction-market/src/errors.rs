@@ -40,4 +40,13 @@ pub enum PredictionMarketPlaceErrors {
 
     #[msg("Insufficient Funds in prediction market treasury")]
     InsufficientFundsInTreasury,
+
+    #[msg("Market not yet resolved")]
+    MarketNotYetResolved,
+
+    #[msg("Market already resolved")]
+    AlreadyResolved,
+
+    #[msg("No Outcome")]
+    NoOutcome,
 }

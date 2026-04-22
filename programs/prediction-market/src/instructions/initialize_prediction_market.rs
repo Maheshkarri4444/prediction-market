@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{PredictionMarketPlaceDetails, RESOLVE_REWARD, prediction_marketplace_details};
+use crate::{PredictionMarketPlaceDetails, RESOLVE_REWARD};
 use crate::errors::PredictionMarketPlaceErrors;
 
 #[derive(Accounts)]
@@ -82,7 +82,6 @@ pub fn claim_funds(ctx: Context<ClaimFunds>)-> Result<()> {
         let amount = **vault_lamports;
         require!(amount != 0 , PredictionMarketPlaceErrors::NoFundsInVault);
         let out_funds = amount - resolved_amount as u64;
-        require!(out_funds <= amount,PredictionMarketPlaceErrors::InsufficientFundsInTreasury);
 
         let mut creator_lamports = creator_info.try_borrow_mut_lamports()?;
 

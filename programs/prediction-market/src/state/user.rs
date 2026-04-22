@@ -6,7 +6,7 @@ use crate::MAX_USER;
 pub struct User {
     pub username: String,
     pub pubkey: Pubkey,
-    pub total_interactions: u64,
+    pub total_orders: u64,
     pub bump: u8,
 }
 

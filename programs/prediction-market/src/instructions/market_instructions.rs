@@ -172,8 +172,11 @@ pub fn resolve_market(ctx:Context<ResolveMarket>)-> Result<()> {
     let prediction_market_vault = &mut ctx.accounts.prediction_marketplace_vault;
     let prediction_market = &mut ctx.accounts.prediction_marketplace;
 
+    // here the prediction resultion condition yet to be added.
+    // outcome is to be added.
     require!(market.market_end_time <= clock.unix_timestamp , PredictionMarketPlaceErrors::MarketEndtimeNotReached);
     require!(prediction_market_vault.lamports()>= RESOLVE_REWARD,PredictionMarketPlaceErrors::InsufficientFundsInTreasury);
+    require!(!market.resolved,PredictionMarketPlaceErrors::AlreadyResolved);
 
     {
         let prediction_vault_info = prediction_market_vault.to_account_info();

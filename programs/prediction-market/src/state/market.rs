@@ -40,7 +40,7 @@ pub struct Market {
     pub market_end_time: i64, // people can bid upto this time (must be less than target time)
 
     pub resolved: bool,
-    pub outcome: Option<bool>,
+    pub outcome: Option<bool>, // true = yes , false = no
 
     pub yes_pool_vault_bump: u8,
     pub no_pool_vault_bump: u8,
