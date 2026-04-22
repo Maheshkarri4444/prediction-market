@@ -3,7 +3,7 @@ use crate::{
 };
 use anchor_lang::{prelude::*, system_program::Transfer};
 use anchor_spl::{associated_token::spl_associated_token_account::solana_program::native_token::{LAMPORTS_PER_SOL, Sol}, token::*};
-
+use pyth_sdk_solana::{load_price_feed_from_account_info, PriceFeed};
 #[derive(Accounts)]
 pub struct CreateMarket<'info> {
     #[account(mut)]
@@ -149,6 +149,9 @@ pub struct ResolveMarket<'info> {
     )]
     pub market: Account<'info , Market>,
 
+    /// CHECK: Price feed from pyth
+    pub price_feed: UncheckedAccount<'info>,
+
     #[account(
         mut,
         seeds = [b"predictionmarketplace"],
@@ -171,12 +174,46 @@ pub fn resolve_market(ctx:Context<ResolveMarket>)-> Result<()> {
     let clock = Clock::get()?;
     let prediction_market_vault = &mut ctx.accounts.prediction_marketplace_vault;
     let prediction_market = &mut ctx.accounts.prediction_marketplace;
+    let price_feed_account = &mut ctx.accounts.price_feed;
+    let expected_feed = match market.question_type {
+        QuestionType::GreaterThanAtTime { price_feed, .. } => price_feed,
+        QuestionType::LessThanAtTime { price_feed, .. } => price_feed,
+    };
 
-    // here the prediction resultion condition yet to be added.
-    // outcome is to be added.
     require!(market.market_end_time <= clock.unix_timestamp , PredictionMarketPlaceErrors::MarketEndtimeNotReached);
     require!(prediction_market_vault.lamports()>= RESOLVE_REWARD,PredictionMarketPlaceErrors::InsufficientFundsInTreasury);
     require!(!market.resolved,PredictionMarketPlaceErrors::AlreadyResolved);
+    require!(price_feed_account.key() == expected_feed, PredictionMarketPlaceErrors::PriceFeedMismatch);
+
+    let price_feed = load_price_feed_from_account_info(&price_feed_account.to_account_info(),).map_err(|_| PredictionMarketPlaceErrors::PriceFeedError)?;
+
+    let current_price = price_feed
+        .get_price_no_older_than(clock.unix_timestamp, 60)
+        .ok_or(PredictionMarketPlaceErrors::PriceFeedError)?;
+
+    let price = current_price.price; // i64
+    let expo = current_price.expo;   // i32
+
+    let normalized_price: i64 = if expo < 0 {
+        price
+            .checked_div(10_i64.pow((-expo) as u32))
+            .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
+    } else {
+        price
+            .checked_mul(10_i64.pow(expo as u32))
+            .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
+    };
+
+    let outcome = match &market.question_type {
+        QuestionType::GreaterThanAtTime { target_price, .. } => {
+            normalized_price > *target_price
+        }
+        QuestionType::LessThanAtTime { target_price, .. } => {
+            normalized_price < *target_price
+        }
+    };
+    market.outcome = Some(outcome);
+    market.resolved = true;
 
     {
         let prediction_vault_info = prediction_market_vault.to_account_info();
@@ -189,7 +226,6 @@ pub fn resolve_market(ctx:Context<ResolveMarket>)-> Result<()> {
         **resolver_lamports = (**resolver_lamports).checked_add(RESOLVE_REWARD).ok_or(PredictionMarketPlaceErrors::FundTransferError)?;
     }
 
-    market.resolved = true;
     prediction_market.total_resolved += 1 as u64;
 
     Ok(())

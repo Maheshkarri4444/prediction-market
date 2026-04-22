@@ -49,4 +49,10 @@ pub enum PredictionMarketPlaceErrors {
 
     #[msg("No Outcome")]
     NoOutcome,
+
+    #[msg("Price feed mismatch")]
+    PriceFeedMismatch,
+
+    #[msg("Price feed error")]
+    PriceFeedError,
 }
