@@ -1,7 +1,7 @@
 use anchor_lang::{prelude::*, system_program::Transfer};
 use anchor_spl::{
     associated_token::AssociatedToken,
-    token::{Mint, Token, TokenAccount},
+    token::{self, Burn, Mint, Token, TokenAccount},
 };
 
 use crate::{calculate_price, mint_tokens};
@@ -239,12 +239,14 @@ pub struct ClaimWinningReward<'info> {
     pub no_pool_vault: UncheckedAccount<'info>,
 
     #[account(
+        mut,
         associated_token::mint = yes_token_mint,
         associated_token::authority = user,
     )]
     pub yes_token_account: Account<'info, TokenAccount>,
 
     #[account(
+        mut,
         associated_token::mint = no_token_mint,
         associated_token::authority = user,
     )]
@@ -255,12 +257,14 @@ pub struct ClaimWinningReward<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-pub fn claim_winning_reward(ctx: Context<CreateOrder>) -> Result<()> {
+pub fn claim_winning_reward(ctx: Context<ClaimWinningReward>) -> Result<()> {
     let market = &mut ctx.accounts.market;
     let yes_token_mint = &mut ctx.accounts.yes_token_mint;
     let no_token_mint = &mut ctx.accounts.no_token_mint;
     let yes_token_account = &mut ctx.accounts.yes_token_account;
     let no_token_account = &mut ctx.accounts.no_token_account;
+
+    let user = &ctx.accounts.user;
 
     let yes_vault = &mut ctx.accounts.yes_pool_vault;
     let no_vault = &mut ctx.accounts.no_pool_vault;
@@ -283,10 +287,15 @@ pub fn claim_winning_reward(ctx: Context<CreateOrder>) -> Result<()> {
     let yes_vault_funds = yes_vault.lamports();
 
     if let Some(outcome) = market.outcome {
-        let user_account_info = ctx.accounts.user.to_account_info();
+        let user_account_info = user.to_account_info();
         let mut user_lamports = user_account_info.try_borrow_mut_lamports()?;
+        let user_yes_tokens = yes_token_account.amount;
+        let user_no_tokens = no_token_account.amount;
         if outcome {
-            let user_yes_tokens = yes_token_account.amount;
+            require!(
+                user_yes_tokens != 0,
+                PredictionMarketPlaceErrors::NoTokensAvailable
+            );
             let user_reward = user_yes_tokens
                 .checked_mul(market.yes_pool_amount + market.no_pool_amount as u64)
                 .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
@@ -307,7 +316,10 @@ pub fn claim_winning_reward(ctx: Context<CreateOrder>) -> Result<()> {
                 **user_lamports = (**user_lamports).checked_add(user_reward).unwrap();
             }
         } else {
-            let user_no_tokens = no_token_account.amount;
+            require!(
+                user_no_tokens != 0,
+                PredictionMarketPlaceErrors::NoTokensAvailable
+            );
             let user_reward = user_no_tokens
                 .checked_mul(market.no_pool_amount + market.yes_pool_amount as u64)
                 .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
@@ -332,6 +344,28 @@ pub fn claim_winning_reward(ctx: Context<CreateOrder>) -> Result<()> {
                     .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
             }
         }
+        token::burn(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Burn {
+                    mint: yes_token_mint.to_account_info(),
+                    from: yes_token_account.to_account_info(),
+                    authority: user.to_account_info(),
+                },
+            ),
+            user_yes_tokens,
+        )?;
+        token::burn(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Burn {
+                    mint: no_token_mint.to_account_info(),
+                    from: no_token_account.to_account_info(),
+                    authority: user.to_account_info(),
+                },
+            ),
+            user_no_tokens,
+        )?;
     }
     Ok(())
 }

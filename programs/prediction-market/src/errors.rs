@@ -55,4 +55,7 @@ pub enum PredictionMarketPlaceErrors {
 
     #[msg("Price feed error")]
     PriceFeedError,
+
+    #[msg("User donot hold these tokens")]
+    NoTokensAvailable,
 }
