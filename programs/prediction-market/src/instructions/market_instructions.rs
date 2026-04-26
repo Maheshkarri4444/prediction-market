@@ -1,9 +1,9 @@
 use crate::{
-    CREATION_FEE, MAX_STRING, PredictionMarketPlaceDetails, PredictionMarketPlaceErrors, QuestionType, RESOLVE_REWARD, market::Market, prediction_marketplace_details
+    CREATION_FEE, MAX_STRING, PredictionMarketPlaceDetails, PredictionMarketPlaceErrors, QuestionType, RESOLVE_REWARD, market::Market
 };
 use anchor_lang::{prelude::*, system_program::Transfer};
-use anchor_spl::{associated_token::spl_associated_token_account::solana_program::native_token::{LAMPORTS_PER_SOL, Sol}, token::*};
-use pyth_sdk_solana::{load_price_feed_from_account_info, PriceFeed};
+use anchor_spl::{associated_token::spl_associated_token_account::solana_program::{ native_token::{LAMPORTS_PER_SOL}}, token::*};
+use pyth_sdk_solana::state::SolanaPriceAccount;
 #[derive(Accounts)]
 pub struct CreateMarket<'info> {
     #[account(mut)]
@@ -185,7 +185,7 @@ pub fn resolve_market(ctx:Context<ResolveMarket>)-> Result<()> {
     require!(!market.resolved,PredictionMarketPlaceErrors::AlreadyResolved);
     require!(price_feed_account.key() == expected_feed, PredictionMarketPlaceErrors::PriceFeedMismatch);
 
-    let price_feed = load_price_feed_from_account_info(&price_feed_account.to_account_info(),).map_err(|_| PredictionMarketPlaceErrors::PriceFeedError)?;
+    let price_feed = SolanaPriceAccount::account_info_to_feed(&price_feed_account.to_account_info(),).map_err(|_| PredictionMarketPlaceErrors::PriceFeedError)?;
 
     let current_price = price_feed
         .get_price_no_older_than(clock.unix_timestamp, 60)
