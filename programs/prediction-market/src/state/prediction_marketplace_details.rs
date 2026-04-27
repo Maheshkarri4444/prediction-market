@@ -12,5 +12,5 @@ pub struct PredictionMarketPlaceDetails {
 }
 
 impl PredictionMarketPlaceDetails {
-    pub const LEN: usize = 81;
+    pub const LEN: usize = 82;
 }

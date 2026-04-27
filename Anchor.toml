@@ -8,11 +8,14 @@ skip-lint = false
 [programs.localnet]
 prediction_market = "3nvkQT6k9kcsRuUHoXhUg46p27as9SyJVq4Q6A6ATSkC"
 
+[programs.devnet]
+prediction_market = "9JcjW2redyHBkahstcNDvDJWd4zmPypDeufvS3NDeFyu"
+
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

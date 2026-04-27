@@ -9,8 +9,8 @@ pub struct CreateUser<'info> {
     #[account(
         init,
         payer = user,
-        space = User::LEN,
-        seeds = [b"user", user.key().as_ref()],
+        space = 8 + User::LEN,
+        seeds = [b"user_v1", user.key().as_ref()],
         bump,
     )]
     pub user_account: Account<'info, User>,

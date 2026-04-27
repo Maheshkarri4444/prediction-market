@@ -11,7 +11,7 @@ pub struct CreateMarket<'info> {
 
     #[account(
         mut,
-        seeds = [b"predictionmarketplace"],
+        seeds = [b"predictionmarketplace_v1"],
         bump =  prediction_market_place.bump,
     )]
     pub prediction_market_place: Account<'info, PredictionMarketPlaceDetails>,
@@ -154,7 +154,7 @@ pub struct ResolveMarket<'info> {
 
     #[account(
         mut,
-        seeds = [b"predictionmarketplace"],
+        seeds = [b"predictionmarketplace_v1"],
         bump = prediction_marketplace.bump,
     )]
     pub prediction_marketplace: Account<'info , PredictionMarketPlaceDetails>,

@@ -21,5 +21,5 @@ pub struct Order {
 }
 
 impl Order {
-    pub const LEN: usize = 81;
+    pub const LEN: usize = 128;
 }

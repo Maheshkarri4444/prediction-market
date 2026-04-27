@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{PredictionMarketPlaceDetails, RESOLVE_REWARD};
+use crate::{PredictionMarketPlaceDetails, RESOLVE_REWARD, prediction_market};
 use crate::errors::PredictionMarketPlaceErrors;
 
 #[derive(Accounts)]
@@ -11,8 +11,8 @@ pub struct InitializePredictionMarket<'info> {
     #[account(
         init,
         payer = creator,
-        space = PredictionMarketPlaceDetails::LEN,
-        seeds = [b"predictionmarketplace"],
+        space = 8 + PredictionMarketPlaceDetails::LEN,
+        seeds = [b"predictionmarketplace_v1"],
         bump 
     )]
     pub prediction_market_place: Account<'info,PredictionMarketPlaceDetails>,
@@ -38,6 +38,7 @@ pub fn initialize_prediction_market(ctx: Context<InitializePredictionMarket>)->R
     predition_market_place.total_markets = 0;
     predition_market_place.total_resolved = 0;
     predition_market_place.bump = ctx.bumps.prediction_market_place;
+    predition_market_place.vault_bump = ctx.bumps.prediction_market_place_vault;
 
     predition_market_place.vault = ctx.accounts.prediction_market_place_vault.key();
     Ok(())
@@ -50,7 +51,7 @@ pub struct ClaimFunds<'info> {
     
     #[account(
         mut,
-        seeds = [b"predictionmarketplace"],
+        seeds = [b"predictionmarketplace_v1"],
         bump = prediction_market_place.bump,
     )]
     pub prediction_market_place: Account<'info, PredictionMarketPlaceDetails>,

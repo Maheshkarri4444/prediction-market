@@ -11,5 +11,5 @@ pub struct User {
 }
 
 impl User {
-    pub const LEN: usize = 16 + MAX_USER as usize;
+    pub const LEN: usize = MAX_USER as usize + 45;
 }

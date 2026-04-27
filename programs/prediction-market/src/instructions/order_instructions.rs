@@ -13,34 +13,34 @@ pub struct CreateOrder<'info> {
 
     #[account(
         mut,
-        seeds = [b"user", user.pubkey.as_ref()],
+        seeds = [b"user_v1", user.pubkey.as_ref()],  
         bump = user.bump,
     )]
-    pub user: Account<'info, User>,
+    pub user: Box<Account<'info, User>>,
 
     #[account(
         mut,
-        seeds=[b"market" , market.authority.as_ref() , &market.id.to_le_bytes()],
+        seeds=[b"market", market.authority.as_ref(), &market.id.to_le_bytes()],
         bump = market.bump,
     )]
-    pub market: Account<'info, Market>,
+    pub market: Box<Account<'info, Market>>,
 
     #[account(
         mut,
         address = market.yes_mint,
     )]
-    pub yes_token_mint: Account<'info, Mint>,
+    pub yes_token_mint: Box<Account<'info, Mint>>,
 
     #[account(
         mut,
         address = market.no_mint,
     )]
-    pub no_token_mint: Account<'info, Mint>,
+    pub no_token_mint: Box<Account<'info, Mint>>,
 
     #[account(
         init,
         payer = buyer,
-        space = Order::LEN,
+        space = 8 + Order::LEN,
         seeds = [b"buy_shares", market.key().as_ref(), &(user.total_orders + 1).to_be_bytes()],
         bump
     )]
@@ -49,7 +49,7 @@ pub struct CreateOrder<'info> {
     /// CHECK: yes pool vault for this market.
     #[account(
         mut,
-        seeds = [b"yes_token_vault",market.key().as_ref(),yes_token_mint.key().as_ref()],
+        seeds = [b"yes_token_vault", market.key().as_ref(), yes_token_mint.key().as_ref()],
         bump = market.yes_pool_vault_bump,
     )]
     pub yes_pool_vault: UncheckedAccount<'info>,
@@ -57,37 +57,40 @@ pub struct CreateOrder<'info> {
     /// CHECK: no pool vault for this market.
     #[account(
         mut,
-        seeds = [b"no_token_vault",market.key().as_ref(),no_token_mint.key().as_ref()],
+        seeds = [b"no_token_vault", market.key().as_ref(), no_token_mint.key().as_ref()],
         bump = market.no_pool_vault_bump,
     )]
     pub no_pool_vault: UncheckedAccount<'info>,
 
     #[account(
         init_if_needed,
-        payer = buyer ,
+        payer = buyer,
         associated_token::mint = yes_token_mint,
         associated_token::authority = buyer,
     )]
-    pub yes_token_account: Account<'info, TokenAccount>,
+    pub yes_token_account: Box<Account<'info, TokenAccount>>,
 
     #[account(
         init_if_needed,
-        payer = buyer ,
+        payer = buyer,
         associated_token::mint = no_token_mint,
         associated_token::authority = buyer,
     )]
-    pub no_token_account: Account<'info, TokenAccount>,
+    pub no_token_account: Box<Account<'info, TokenAccount>>,
 
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
-
 pub fn create_order(ctx: Context<CreateOrder>, option: Options, quantity: u64) -> Result<()> {
     let order = &mut ctx.accounts.order;
     let market = &mut ctx.accounts.market;
     let yes_pool_vault = &mut ctx.accounts.yes_pool_vault;
     let no_pool_vault = &mut ctx.accounts.no_pool_vault;
+
+    let yes_lamports = yes_pool_vault.to_account_info().lamports();
+    let no_lamports = no_pool_vault.to_account_info().lamports();
+
     let clock = Clock::get()?;
 
     require!(
@@ -105,14 +108,18 @@ pub fn create_order(ctx: Context<CreateOrder>, option: Options, quantity: u64) -
     );
 
     let selected_pool = if option == Options::Yes {
-        yes_pool_vault.lamports() as u64 + market.yes_virtual_pool_amount as u64
+        yes_lamports as u64 + market.yes_virtual_pool_amount as u64
     } else {
-        no_pool_vault.lamports() as u64 + market.no_virtual_pool_amount as u64
+        no_lamports as u64 + market.no_virtual_pool_amount as u64
     };
-    let total_pool = yes_pool_vault.lamports() as u64
-        + no_pool_vault.lamports() as u64
+    let total_pool = yes_lamports as u64
+        + no_lamports as u64
         + market.yes_virtual_pool_amount as u64
         + market.no_virtual_pool_amount as u64;
+
+    msg!("yes lamports: {}", yes_lamports);
+    msg!("no lamports: {}", no_lamports);
+    msg!("total pool: {}", total_pool);
 
     let computed_price = calculate_price(selected_pool, total_pool)?;
     let required_amount = computed_price as u64 * quantity as u64;
