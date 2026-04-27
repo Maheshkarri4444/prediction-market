@@ -40,8 +40,8 @@ describe("prediction-market-devnet", () => {
 
   // 🔥 REAL PYTH ETH PRICE FEED (DEVNET)
   const PYTH_ETH_FEED = new PublicKey(
-    "J83w4HKfqxwcq3t4eLQ7nZ8b8s8f1L9E4yF4gq5K6v8y"
-  );
+      "EdVCmQ9FSPcVe5YySXDPCRmc8aDQLKJ9xvYBMZPie1Vw"
+    );
 
   // --------------------------------------------------
   // 1. Initialize Prediction Marketplace
@@ -237,65 +237,76 @@ describe("prediction-market-devnet", () => {
   // --------------------------------------------------
   // 6. Resolve Market
   // --------------------------------------------------
-  // it("Resolve Market", async () => {
-  //   console.log("Waiting for market end...");
-  //   await new Promise((r) => setTimeout(r, 65000));
+  it("Resolve Market", async () => {
+    console.log("Waiting for market end...");
+    await new Promise((r) => setTimeout(r, 65000));
 
-  //   await program.methods
-  //     .resolveMarket()
-  //     .accounts({
-  //       resolver: creator.publicKey,
-  //       market: marketPda,
-  //       priceFeed: PYTH_ETH_FEED,
-  //       predictionMarketplace: marketplacePda,
-  //       predictionMarketplaceVault: marketplaceVault,
-  //     })
-  //     .rpc();
 
-  //   const market = await program.account.market.fetch(marketPda);
-  //   assert.equal(market.resolved, true);
-  // });
+
+    try {
+
+    await program.methods
+      .resolveMarket()
+      .accounts({
+        resolver: creator.publicKey,
+        market: marketPda,
+        priceFeed: PYTH_ETH_FEED,
+        predictionMarketplace: marketplacePda,
+        predictionMarketplaceVault: marketplaceVault,
+      })
+      .rpc();
+    } catch (err) {
+      console.log("TX ERROR:", err);
+      if (err.logs) {
+        console.log("PROGRAM LOGS:\n", err.logs.join("\n"));
+      }
+     throw err;
+    }
+
+    const market = await program.account.market.fetch(marketPda);
+    assert.equal(market.resolved, true);
+  });
 
   // // --------------------------------------------------
   // // 7. Claim Reward
   // // --------------------------------------------------
-  // it("Claim Reward", async () => {
-  //   await program.methods
-  //     .claimWinningReward()
-  //     .accounts({
-  //       user: user1.publicKey,
-  //       market: marketPda,
-  //       yesTokenMint: yesMint.publicKey,
-  //       noTokenMint: noMint.publicKey,
-  //       yesPoolVault: yesVault,
-  //       noPoolVault: noVault,
-  //       yesTokenAccount: anchor.utils.token.associatedAddress({
-  //         mint: yesMint.publicKey,
-  //         owner: user1.publicKey,
-  //       }),
-  //       noTokenAccount: anchor.utils.token.associatedAddress({
-  //         mint: noMint.publicKey,
-  //         owner: user1.publicKey,
-  //       }),
-  //       systemProgram: SystemProgram.programId,
-  //       tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
-  //       associatedTokenProgram: anchor.utils.token.ASSOCIATED_PROGRAM_ID,
-  //     })
-  //     .signers([user1])
-  //     .rpc();
-  // });
+  it("Claim Reward", async () => {
+    await program.methods
+      .claimWinningReward()
+      .accounts({
+        user: user1.publicKey,
+        market: marketPda,
+        yesTokenMint: yesMint.publicKey,
+        noTokenMint: noMint.publicKey,
+        yesPoolVault: yesVault,
+        noPoolVault: noVault,
+        yesTokenAccount: anchor.utils.token.associatedAddress({
+          mint: yesMint.publicKey,
+          owner: user1.publicKey,
+        }),
+        noTokenAccount: anchor.utils.token.associatedAddress({
+          mint: noMint.publicKey,
+          owner: user1.publicKey,
+        }),
+        systemProgram: SystemProgram.programId,
+        tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
+        associatedTokenProgram: anchor.utils.token.ASSOCIATED_PROGRAM_ID,
+      })
+      .signers([user1])
+      .rpc();
+  });
 
   // // --------------------------------------------------
   // // 8. Creator Claim Treasury
   // // --------------------------------------------------
-  // it("Claim Treasury", async () => {
-  //   await program.methods
-  //     .claimFunds()
-  //     .accounts({
-  //       creator: creator.publicKey,
-  //       predictionMarketPlace: marketplacePda,
-  //       predictionMarketPlaceVault: marketplaceVault,
-  //     })
-  //     .rpc();
-  // });
+  it("Claim Treasury", async () => {
+    await program.methods
+      .claimFunds()
+      .accounts({
+        creator: creator.publicKey,
+        predictionMarketPlace: marketplacePda,
+        predictionMarketPlaceVault: marketplaceVault,
+      })
+      .rpc();
+  });
 });

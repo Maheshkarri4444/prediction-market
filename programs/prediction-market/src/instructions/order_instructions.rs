@@ -204,7 +204,6 @@ pub fn create_order(ctx: Context<CreateOrder>, option: Options, quantity: u64) -
     Ok(())
 }
 
-// next task claim winning reward.
 #[derive(Accounts)]
 pub struct ClaimWinningReward<'info> {
     #[account(mut)]
@@ -295,60 +294,65 @@ pub fn claim_winning_reward(ctx: Context<ClaimWinningReward>) -> Result<()> {
 
     if let Some(outcome) = market.outcome {
         let user_account_info = user.to_account_info();
-        let mut user_lamports = user_account_info.try_borrow_mut_lamports()?;
         let user_yes_tokens = yes_token_account.amount;
         let user_no_tokens = no_token_account.amount;
-        if outcome {
-            require!(
-                user_yes_tokens != 0,
-                PredictionMarketPlaceErrors::NoTokensAvailable
-            );
-            let user_reward = user_yes_tokens
-                .checked_mul(market.yes_pool_amount + market.no_pool_amount as u64)
-                .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
-                .checked_div(total_yes_tokens)
-                .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+        {
+            let mut user_lamports = user_account_info.try_borrow_mut_lamports()?;
 
-            {
-                let mut yes_vault_lamports = yes_vault_account_info.try_borrow_mut_lamports()?;
-                let mut no_vault_lamports = no_vault_account_info.try_borrow_mut_lamports()?;
-
-                if **no_vault_lamports != 0 {
-                    **no_vault_lamports =
-                        (**no_vault_lamports).checked_sub(no_vault_funds).unwrap();
-                    **yes_vault_lamports =
-                        (**yes_vault_lamports).checked_add(no_vault_funds).unwrap();
-                }
-                **yes_vault_lamports = (**yes_vault_lamports).checked_sub(user_reward).unwrap();
-                **user_lamports = (**user_lamports).checked_add(user_reward).unwrap();
-            }
-        } else {
-            require!(
-                user_no_tokens != 0,
-                PredictionMarketPlaceErrors::NoTokensAvailable
-            );
-            let user_reward = user_no_tokens
-                .checked_mul(market.no_pool_amount + market.yes_pool_amount as u64)
-                .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
-                .checked_div(total_no_tokens)
-                .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
-            {
-                let mut yes_vault_lamports = yes_vault_account_info.try_borrow_mut_lamports()?;
-                let mut no_vault_lamports = no_vault_account_info.try_borrow_mut_lamports()?;
-
-                if **yes_vault_lamports != 0 {
-                    **yes_vault_lamports =
-                        (**yes_vault_lamports).checked_sub(yes_vault_funds).unwrap();
-                    **no_vault_lamports =
-                        (**no_vault_lamports).checked_add(yes_vault_funds).unwrap();
-                }
-
-                **no_vault_lamports = (**no_vault_lamports)
-                    .checked_sub(user_reward)
+            if outcome {
+                require!(
+                    user_yes_tokens != 0,
+                    PredictionMarketPlaceErrors::NoTokensAvailable
+                );
+                let user_reward = user_yes_tokens
+                    .checked_mul(market.yes_pool_amount + market.no_pool_amount as u64)
+                    .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
+                    .checked_div(total_yes_tokens)
                     .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
-                **user_lamports = (**user_lamports)
-                    .checked_add(user_reward)
+
+                {
+                    let mut yes_vault_lamports =
+                        yes_vault_account_info.try_borrow_mut_lamports()?;
+                    let mut no_vault_lamports = no_vault_account_info.try_borrow_mut_lamports()?;
+
+                    if **no_vault_lamports != 0 {
+                        **no_vault_lamports =
+                            (**no_vault_lamports).checked_sub(no_vault_funds).unwrap();
+                        **yes_vault_lamports =
+                            (**yes_vault_lamports).checked_add(no_vault_funds).unwrap();
+                    }
+                    **yes_vault_lamports = (**yes_vault_lamports).checked_sub(user_reward).unwrap();
+                    **user_lamports = (**user_lamports).checked_add(user_reward).unwrap();
+                }
+            } else {
+                require!(
+                    user_no_tokens != 0,
+                    PredictionMarketPlaceErrors::NoTokensAvailable
+                );
+                let user_reward = user_no_tokens
+                    .checked_mul(market.no_pool_amount + market.yes_pool_amount as u64)
+                    .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
+                    .checked_div(total_no_tokens)
                     .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+                {
+                    let mut yes_vault_lamports =
+                        yes_vault_account_info.try_borrow_mut_lamports()?;
+                    let mut no_vault_lamports = no_vault_account_info.try_borrow_mut_lamports()?;
+
+                    if **yes_vault_lamports != 0 {
+                        **yes_vault_lamports =
+                            (**yes_vault_lamports).checked_sub(yes_vault_funds).unwrap();
+                        **no_vault_lamports =
+                            (**no_vault_lamports).checked_add(yes_vault_funds).unwrap();
+                    }
+
+                    **no_vault_lamports = (**no_vault_lamports)
+                        .checked_sub(user_reward)
+                        .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+                    **user_lamports = (**user_lamports)
+                        .checked_add(user_reward)
+                        .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+                }
             }
         }
         token::burn(
@@ -357,7 +361,7 @@ pub fn claim_winning_reward(ctx: Context<ClaimWinningReward>) -> Result<()> {
                 Burn {
                     mint: yes_token_mint.to_account_info(),
                     from: yes_token_account.to_account_info(),
-                    authority: user.to_account_info(),
+                    authority: user_account_info,
                 },
             ),
             user_yes_tokens,

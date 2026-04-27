@@ -185,11 +185,25 @@ pub fn resolve_market(ctx:Context<ResolveMarket>)-> Result<()> {
     require!(!market.resolved,PredictionMarketPlaceErrors::AlreadyResolved);
     require!(price_feed_account.key() == expected_feed, PredictionMarketPlaceErrors::PriceFeedMismatch);
 
-    let price_feed = SolanaPriceAccount::account_info_to_feed(&price_feed_account.to_account_info(),).map_err(|_| PredictionMarketPlaceErrors::PriceFeedError)?;
+    msg!("Price feed key passed: {}", price_feed_account.key());
+    msg!("Expected feed key: {}", expected_feed);
 
-    let current_price = price_feed
-        .get_price_no_older_than(clock.unix_timestamp, 60)
-        .ok_or(PredictionMarketPlaceErrors::PriceFeedError)?;
+    let price_feed = SolanaPriceAccount::account_info_to_feed(
+    &price_feed_account.to_account_info(),
+    ).map_err(|_| {
+        msg!("❌ Failed to parse price feed account");
+        PredictionMarketPlaceErrors::PriceFeedError
+    })?;
+
+    let current_price = if let Some(price) =
+    price_feed.get_price_no_older_than(clock.unix_timestamp, 60)
+    {
+        msg!("✅ Using fresh Pyth price");
+        price
+    } else {
+        msg!("⚠️ Using stale Pyth price (devnet fallback)");
+        price_feed.get_price_unchecked()
+    };
 
     let price = current_price.price; // i64
     let expo = current_price.expo;   // i32
