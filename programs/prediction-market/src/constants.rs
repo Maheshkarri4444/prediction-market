@@ -5,3 +5,4 @@ pub const CREATION_FEE: u64 = (1 * LAMPORTS_PER_SOL as u64).checked_div(10).unwr
 pub const RESOLVE_REWARD: u64 =
     CREATION_FEE as u64 - (1 * LAMPORTS_PER_SOL as u64).checked_div(40).unwrap() as u64;
 pub const MAX_USER: usize = 30;
+pub const MAX_OUTCOMES: usize = 5;
