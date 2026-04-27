@@ -1,17 +1,11 @@
 use anchor_lang::prelude::*;
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Eq, PartialEq)]
-pub enum Options {
-    Yes,
-    No,
-}
-
 #[account]
 pub struct Order {
     pub buyer: Pubkey,
 
     pub market: Pubkey,
-    pub option: Options,
+    pub option: u8,
 
     pub quantity: u64,
 

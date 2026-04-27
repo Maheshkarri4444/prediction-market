@@ -40,7 +40,7 @@ pub mod prediction_market {
     // -----------------------------------
     // CREATE ORDER
     // -----------------------------------
-    pub fn create_order(ctx: Context<CreateOrder>, option: Options, quantity: u64) -> Result<()> {
+    pub fn create_order(ctx: Context<CreateOrder>, option: u8, quantity: u64) -> Result<()> {
         instructions::create_order(ctx, option, quantity)
     }
 

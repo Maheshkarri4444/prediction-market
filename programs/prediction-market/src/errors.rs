@@ -32,6 +32,9 @@ pub enum PredictionMarketPlaceErrors {
     #[msg("Market endtime reached")]
     MarketClosed,
 
+    #[msg("Market not yet started")]
+    MarketNotYetStarted,
+
     #[msg("Market Endtime not yet reached")]
     MarketEndtimeNotReached,
 
@@ -64,4 +67,7 @@ pub enum PredictionMarketPlaceErrors {
 
     #[msg("Target time not yet reached")]
     TargetTimeNotYetReached,
+
+    #[msg("Token Mint mismatch")]
+    TokenMintMismatch,
 }

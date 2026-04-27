@@ -5,7 +5,7 @@ use anchor_spl::{
 };
 
 use crate::{calculate_price, mint_tokens};
-use crate::{Market, Options, Order, PredictionMarketPlaceErrors, User};
+use crate::{Market, Order, PredictionMarketPlaceErrors, User};
 #[derive(Accounts)]
 pub struct CreateOrder<'info> {
     #[account(mut)]
@@ -25,17 +25,8 @@ pub struct CreateOrder<'info> {
     )]
     pub market: Box<Account<'info, Market>>,
 
-    #[account(
-        mut,
-        address = market.yes_mint,
-    )]
-    pub yes_token_mint: Box<Account<'info, Mint>>,
-
-    #[account(
-        mut,
-        address = market.no_mint,
-    )]
-    pub no_token_mint: Box<Account<'info, Mint>>,
+    #[account(mut)]
+    pub token_mint: Box<Account<'info, Mint>>,
 
     #[account(
         init,
@@ -46,101 +37,74 @@ pub struct CreateOrder<'info> {
     )]
     pub order: Account<'info, Order>,
 
-    /// CHECK: yes pool vault for this market.
-    #[account(
-        mut,
-        seeds = [b"yes_token_vault", market.key().as_ref(), yes_token_mint.key().as_ref()],
-        bump = market.yes_pool_vault_bump,
-    )]
-    pub yes_pool_vault: UncheckedAccount<'info>,
-
-    /// CHECK: no pool vault for this market.
-    #[account(
-        mut,
-        seeds = [b"no_token_vault", market.key().as_ref(), no_token_mint.key().as_ref()],
-        bump = market.no_pool_vault_bump,
-    )]
-    pub no_pool_vault: UncheckedAccount<'info>,
+    /// CHECK: pool vault for this market.
+    #[account(mut)]
+    pub pool_vault: UncheckedAccount<'info>,
 
     #[account(
         init_if_needed,
         payer = buyer,
-        associated_token::mint = yes_token_mint,
+        associated_token::mint = token_mint,
         associated_token::authority = buyer,
     )]
-    pub yes_token_account: Box<Account<'info, TokenAccount>>,
-
-    #[account(
-        init_if_needed,
-        payer = buyer,
-        associated_token::mint = no_token_mint,
-        associated_token::authority = buyer,
-    )]
-    pub no_token_account: Box<Account<'info, TokenAccount>>,
+    pub token_account: Box<Account<'info, TokenAccount>>,
 
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
-pub fn create_order(ctx: Context<CreateOrder>, option: Options, quantity: u64) -> Result<()> {
+pub fn create_order(ctx: Context<CreateOrder>, option: u8, quantity: u64) -> Result<()> {
     let order = &mut ctx.accounts.order;
     let market = &mut ctx.accounts.market;
-    let yes_pool_vault = &mut ctx.accounts.yes_pool_vault;
-    let no_pool_vault = &mut ctx.accounts.no_pool_vault;
+    let mut total_pool: u64 = 0;
+    for (_, option) in market.options.iter().enumerate() {
+        total_pool += option.pool_amount as u64;
+        total_pool += option.virtual_pool_amount as u64;
+    }
 
-    let yes_lamports = yes_pool_vault.to_account_info().lamports();
-    let no_lamports = no_pool_vault.to_account_info().lamports();
+    let market_status = market.started;
+    let market_info = market.to_account_info();
+    let market_endtime = market.market_end_time;
+
+    let pool_vault = &mut ctx.accounts.pool_vault;
+
+    let selected = &mut market.options[option as usize];
+
+    let pool_lamports = pool_vault.to_account_info().lamports();
 
     let clock = Clock::get()?;
 
     require!(
-        clock.unix_timestamp < market.market_end_time,
+        market_status,
+        PredictionMarketPlaceErrors::MarketNotYetStarted
+    );
+
+    require!(
+        clock.unix_timestamp < market_endtime,
         PredictionMarketPlaceErrors::MarketClosed
     );
 
     require!(
-        yes_pool_vault.key() == market.yes_pool_vault,
-        PredictionMarketPlaceErrors::PoolVaultMismatch
+        ctx.accounts.token_mint.key() == selected.mint,
+        PredictionMarketPlaceErrors::TokenMintMismatch
     );
+
     require!(
-        no_pool_vault.key() == market.no_pool_vault,
+        pool_vault.key() == selected.pool_vault,
         PredictionMarketPlaceErrors::PoolVaultMismatch
     );
 
-    let selected_pool = if option == Options::Yes {
-        yes_lamports as u64 + market.yes_virtual_pool_amount as u64
-    } else {
-        no_lamports as u64 + market.no_virtual_pool_amount as u64
-    };
-    let total_pool = yes_lamports as u64
-        + no_lamports as u64
-        + market.yes_virtual_pool_amount as u64
-        + market.no_virtual_pool_amount as u64;
-
-    msg!("yes lamports: {}", yes_lamports);
-    msg!("no lamports: {}", no_lamports);
-    msg!("total pool: {}", total_pool);
+    let selected_pool = pool_lamports + selected.virtual_pool_amount as u64;
 
     let computed_price = calculate_price(selected_pool, total_pool)?;
     let required_amount = computed_price as u64 * quantity as u64;
 
-    let selected_vault = if option == Options::Yes {
-        yes_pool_vault
-    } else {
-        no_pool_vault
-    };
-    let selected_mint = if option == Options::Yes {
-        &ctx.accounts.yes_token_mint
-    } else {
-        &ctx.accounts.no_token_mint
-    };
-    let selected_to_token_account = if option == Options::Yes {
-        &ctx.accounts.yes_token_account
-    } else {
-        &ctx.accounts.no_token_account
-    };
+    let selected_vault = pool_vault;
 
-    let authority_info = market.to_account_info();
+    let selected_mint = &ctx.accounts.token_mint;
+    let selected_to_token_account = &ctx.accounts.token_account;
+
+    let authority_info = market_info;
 
     require!(
         ctx.accounts.buyer.lamports() >= required_amount,
@@ -158,17 +122,10 @@ pub fn create_order(ctx: Context<CreateOrder>, option: Options, quantity: u64) -
         required_amount,
     )?;
 
-    if option == Options::Yes {
-        market.yes_pool_amount = market
-            .yes_pool_amount
-            .checked_add(required_amount)
-            .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
-    } else {
-        market.no_pool_amount = market
-            .no_pool_amount
-            .checked_add(required_amount)
-            .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
-    }
+    selected.pool_amount = selected
+        .pool_amount
+        .checked_add(required_amount)
+        .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
 
     let signer: &[&[u8]] = &[
         b"market",
@@ -192,13 +149,7 @@ pub fn create_order(ctx: Context<CreateOrder>, option: Options, quantity: u64) -
     order.market = ctx.accounts.market.key();
     order.option = option.clone();
     order.quantity = quantity;
-
-    if option == Options::Yes {
-        order.token_account = ctx.accounts.yes_token_account.key();
-    } else if option == Options::No {
-        order.token_account = ctx.accounts.no_token_account.key();
-    }
-
+    order.token_account = ctx.accounts.token_account.key();
     order.time_stamp = clock.unix_timestamp as i64;
 
     Ok(())
