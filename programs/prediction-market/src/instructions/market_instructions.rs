@@ -37,6 +37,16 @@ pub struct CreateMarket<'info> {
     )]
     pub market: Account<'info, Market>,
 
+    /// CHECK: Vault of Token pool
+    #[account(
+        init,
+        payer = creator,
+        space = 8,
+        seeds = [b"market_vault", market.authority.as_ref(), market.key().as_ref()],
+        bump,
+    )]
+    pub market_vault: UncheckedAccount<'info>,
+
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
@@ -97,6 +107,9 @@ pub fn create_market(
     market.resolved = false;
     market.final_outcome = None;
 
+    market.vault = ctx.accounts.market_vault.key();
+    market.vault_bump = ctx.bumps.market_vault;
+
     market.bump = ctx.bumps.market;
 
     prediction_market.total_markets += 1 as u64;
@@ -123,19 +136,8 @@ pub struct AddOptionDetails<'info> {
     )]
     pub token_mint: Account<'info, Mint>,
 
-    /// CHECK: Vault of Token pool
-    #[account(
-        init,
-        payer = creator,
-        space = 8,
-        seeds = [b"token_vault",market.key().as_ref(),token_mint.key().as_ref()],
-        bump,
-    )]
-    pub pool_vault: UncheckedAccount<'info>,
-
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
-    pub rent: Sysvar<'info, Rent>,
 }
 
 pub fn add_option_details(ctx: Context<AddOptionDetails>) -> Result<()> {
@@ -150,10 +152,8 @@ pub fn add_option_details(ctx: Context<AddOptionDetails>) -> Result<()> {
     option.market = market.key();
     option.option_id = market.options.len() as u8;
     option.mint = ctx.accounts.token_mint.key();
-    option.pool_vault = ctx.accounts.pool_vault.key();
     option.virtual_pool_amount = 10 * LAMPORTS_PER_SOL as u64;
     option.pool_amount = 0;
-    option.pool_vault_bump = ctx.bumps.pool_vault;
 
     market.options.push(option);
 

@@ -54,6 +54,8 @@ pub struct Market {
     pub started: bool,
     pub final_outcome: Option<u8>, // for binary 0, 1 . and for options its multi choice like 0,1,2.
 
+    pub vault: Pubkey,
+    pub vault_bump: u8,
     pub bump: u8,
 }
 
@@ -70,10 +72,8 @@ pub struct OptionDetails {
     pub market: Pubkey,
     pub option_id: u8,
     pub mint: Pubkey,
-    pub pool_vault: Pubkey,
     pub virtual_pool_amount: u64,
     pub pool_amount: u64,
-    pub pool_vault_bump: u8,
 }
 
 impl OptionDetails {
@@ -82,10 +82,8 @@ impl OptionDetails {
             market: Pubkey::default(),
             option_id: 0,
             mint: Pubkey::default(),
-            pool_vault: Pubkey::default(),
             virtual_pool_amount: 0,
             pool_amount: 0,
-            pool_vault_bump: 0,
         }
     }
 }

@@ -38,8 +38,12 @@ pub struct CreateOrder<'info> {
     pub order: Account<'info, Order>,
 
     /// CHECK: pool vault for this market.
-    #[account(mut)]
-    pub pool_vault: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        seeds = [b"market_vault", market.authority.as_ref(), market.key().as_ref()],
+        bump = market.vault_bump,
+    )]
+    pub market_vault: UncheckedAccount<'info>,
 
     #[account(
         init_if_needed,
@@ -66,11 +70,11 @@ pub fn create_order(ctx: Context<CreateOrder>, option: u8, quantity: u64) -> Res
     let market_info = market.to_account_info();
     let market_endtime = market.market_end_time;
 
-    let pool_vault = &mut ctx.accounts.pool_vault;
+    let market_vault = &mut ctx.accounts.market_vault;
 
     let selected = &mut market.options[option as usize];
 
-    let pool_lamports = pool_vault.to_account_info().lamports();
+    let pool_lamports = selected.pool_amount;
 
     let clock = Clock::get()?;
 
@@ -89,17 +93,10 @@ pub fn create_order(ctx: Context<CreateOrder>, option: u8, quantity: u64) -> Res
         PredictionMarketPlaceErrors::TokenMintMismatch
     );
 
-    require!(
-        pool_vault.key() == selected.pool_vault,
-        PredictionMarketPlaceErrors::PoolVaultMismatch
-    );
-
     let selected_pool = pool_lamports + selected.virtual_pool_amount as u64;
 
     let computed_price = calculate_price(selected_pool, total_pool)?;
     let required_amount = computed_price as u64 * quantity as u64;
-
-    let selected_vault = pool_vault;
 
     let selected_mint = &ctx.accounts.token_mint;
     let selected_to_token_account = &ctx.accounts.token_account;
@@ -116,7 +113,7 @@ pub fn create_order(ctx: Context<CreateOrder>, option: u8, quantity: u64) -> Res
             ctx.accounts.system_program.to_account_info(),
             Transfer {
                 from: ctx.accounts.buyer.to_account_info(),
-                to: selected_vault.to_account_info(),
+                to: market_vault.to_account_info(),
             },
         ),
         required_amount,
