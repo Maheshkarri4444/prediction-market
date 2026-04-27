@@ -58,4 +58,7 @@ pub enum PredictionMarketPlaceErrors {
 
     #[msg("User donot hold these tokens")]
     NoTokensAvailable,
+
+    #[msg("Options Out of Range")]
+    OptionsOutOfRange,
 }
