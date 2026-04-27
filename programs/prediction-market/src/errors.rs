@@ -61,4 +61,7 @@ pub enum PredictionMarketPlaceErrors {
 
     #[msg("Options Out of Range")]
     OptionsOutOfRange,
+
+    #[msg("Target time not yet reached")]
+    TargetTimeNotYetReached,
 }

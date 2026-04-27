@@ -204,12 +204,27 @@ pub fn resolve_market(ctx: Context<ResolveMarket>) -> Result<()> {
     let expected_feed = match market.question_type {
         QuestionType::GreaterThanAtTime { price_feed, .. } => price_feed,
         QuestionType::LessThanAtTime { price_feed, .. } => price_feed,
+        QuestionType::RangeAtTime { price_feed, .. } => price_feed,
+        QuestionType::RangeOfPrice { price_feed, .. } => price_feed,
+    };
+
+    let time = match market.question_type {
+        QuestionType::GreaterThanAtTime { time, .. } => time,
+        QuestionType::LessThanAtTime { time, .. } => time,
+        QuestionType::RangeAtTime { time, .. } => time,
+        QuestionType::RangeOfPrice { time, .. } => time,
     };
 
     require!(
         market.market_end_time <= clock.unix_timestamp,
         PredictionMarketPlaceErrors::MarketEndtimeNotReached
     );
+
+    require!(
+        time <= clock.unix_timestamp,
+        PredictionMarketPlaceErrors::TargetTimeNotYetReached
+    );
+
     require!(
         prediction_market_vault.lamports() >= RESOLVE_REWARD,
         PredictionMarketPlaceErrors::InsufficientFundsInTreasury
@@ -257,10 +272,44 @@ pub fn resolve_market(ctx: Context<ResolveMarket>) -> Result<()> {
     };
 
     let outcome = match &market.question_type {
-        QuestionType::GreaterThanAtTime { target_price, .. } => normalized_price > *target_price,
-        QuestionType::LessThanAtTime { target_price, .. } => normalized_price < *target_price,
+        QuestionType::GreaterThanAtTime { target_price, .. } => {
+            if normalized_price > *target_price {
+                1
+            } else {
+                0
+            }
+        }
+        QuestionType::LessThanAtTime { target_price, .. } => {
+            if normalized_price < *target_price {
+                1
+            } else {
+                0
+            }
+        }
+        QuestionType::RangeAtTime {
+            upper_bound,
+            lower_bound,
+            ..
+        } => {
+            if normalized_price > *lower_bound && normalized_price < *upper_bound {
+                1 // inside range
+            } else {
+                0 // outside
+            }
+        }
+        QuestionType::RangeOfPrice { options, .. } => {
+            let mut found: Option<u8> = None;
+
+            for (i, opt) in options.iter().enumerate() {
+                if normalized_price > opt.lower_bound && normalized_price < opt.upper_bound {
+                    found = Some(i as u8);
+                    break;
+                }
+            }
+            found.ok_or(PredictionMarketPlaceErrors::NoOutcome)?
+        }
     };
-    market.outcome = Some(outcome);
+    market.final_outcome = Some(outcome);
     market.resolved = true;
 
     {
