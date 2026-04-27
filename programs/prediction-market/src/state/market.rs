@@ -14,8 +14,26 @@ pub enum QuestionType {
         target_price: i64,
         time: i64,
     },
+
+    RangeAtTime {
+        price_feed: Pubkey,
+        upper_bound: i64,
+        lower_bound: i64,
+        time: i64,
+    },
+
+    RangeOfPrice {
+        price_feed: Pubkey,
+        options: Vec<PriceOption>,
+        time: i64,
+    },
 }
 
+#[derive(Debug, AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
+pub struct PriceOption {
+    pub upper_bound: i64,
+    pub lower_bound: i64,
+}
 #[account]
 pub struct Market {
     pub id: u64,
