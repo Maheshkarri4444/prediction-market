@@ -113,6 +113,14 @@ pub struct AddFounder<'info> {
     )]
     pub founder_token_account: Account<'info, TokenAccount>,
 
+    #[account(
+        init,
+        payer = creator,
+        associated_token::mint = dao_nft_mint,
+        associated_token::authority = founder,
+    )]
+    pub founder_nft_account: Account<'info , TokenAccount>,
+
     /// CHECK: metadata
     #[account(mut)]
     pub metadata: UncheckedAccount<'info>,
@@ -132,7 +140,7 @@ pub fn add_founder (ctx: Context<AddFounder>, username: String , symbol: String 
     let founder = &mut ctx.accounts.founder;
     let dao_user = &mut ctx.accounts.dao_user;
     let founder_token_account = &mut ctx.accounts.founder_token_account;
-
+    let founder_nft_account = &mut ctx.accounts.founder_nft_account;
     let dao = &mut ctx.accounts.dao;
 
 
@@ -155,7 +163,7 @@ pub fn add_founder (ctx: Context<AddFounder>, username: String , symbol: String 
             ctx.accounts.token_program.to_account_info(), 
             MintTo { 
                 mint: ctx.accounts.dao_nft_mint.to_account_info(), 
-                to: founder_token_account.to_account_info(), 
+                to: founder_nft_account.to_account_info(), 
                 authority: dao.to_account_info(), 
             },
             signer_seeds,
@@ -206,10 +214,24 @@ pub fn add_founder (ctx: Context<AddFounder>, username: String , symbol: String 
         ],
     )?;
 
+    // 500 tokens to be minted
+    token::mint_to(
+        CpiContext::new(
+            ctx.accounts.token_program.to_account_info(), 
+            MintTo { 
+                mint: ctx.accounts.dao_token_mint.to_account_info(), 
+                to: founder_token_account.to_account_info(), 
+                authority: dao.to_account_info(),
+            }
+        ), 
+        500
+    )?;
+
+
     dao_user.username = username; 
     dao_user.pubkey = founder.key();
     dao_user.reputation = 10;
-    dao_user.token_balance = 500; // 500 tokens to be minted.
+    dao_user.token_balance = 500; 
     dao_user.total_actions = 0;
     dao_user.bump = ctx.bumps.dao_user;
     dao.total_members += 1 as u64;
