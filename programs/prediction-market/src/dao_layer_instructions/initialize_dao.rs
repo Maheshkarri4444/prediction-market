@@ -224,15 +224,15 @@ pub fn add_founder (ctx: Context<AddFounder>, username: String , symbol: String 
                 authority: dao.to_account_info(),
             }
         ), 
-        500
+        200
     )?;
 
 
     dao_user.username = username; 
     dao_user.pubkey = founder.key();
     dao_user.nft_mint = ctx.accounts.dao_nft_mint.key();
-    dao_user.reputation = 10;
-    dao_user.token_balance = 500; 
+    dao_user.reputation = 20;
+    dao_user.token_balance = 200; 
     dao_user.total_actions = 0;
     dao_user.bump = ctx.bumps.dao_user;
     dao.total_members += 1 as u64;

@@ -100,4 +100,7 @@ pub enum PredictionMarketDaoErrors {
 
     #[msg("NFT already minted")]
     NftAlreadyMinted,
+
+    #[msg("User has balance less than Creation fee")]
+    InsufficientBalance,
 }
