@@ -82,4 +82,7 @@ pub enum PredictionMarketPlaceErrors {
 
     #[msg("Invalid Option")]
     InvalidOption,
+
+    #[msg("Invalid Price")]
+    InvalidPrice,
 }

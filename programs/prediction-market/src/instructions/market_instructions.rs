@@ -367,17 +367,63 @@ pub fn resolve_market(ctx: Context<ResolveMarket>) -> Result<()> {
             found.ok_or(PredictionMarketPlaceErrors::NoOutcome)?
         }
         QuestionType::PercentageUp {
-            price_feed,
+            price_feed: _,
             percentage,
             current_price,
-            time,
-        } => {}
+            time: _,
+        } => {
+            let latest_price = normalized_price;
+            require!(
+                *current_price > 0,
+                PredictionMarketPlaceErrors::InvalidPrice
+            );
+            let diff = latest_price
+                .checked_sub(*current_price)
+                .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+
+            let percentage_change = diff
+                .checked_mul(10_000) // basis points
+                .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
+                .checked_div(*current_price)
+                .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+
+            let is_true = percentage_change >= (*percentage as i64 * 100);
+
+            if is_true {
+                1
+            } else {
+                0
+            }
+        }
         QuestionType::PercentageDown {
-            price_feed,
+            price_feed: _,
             percentage,
             current_price,
-            time,
-        } => {}
+            time: _,
+        } => {
+            let latest_price = normalized_price;
+            require!(
+                *current_price > 0,
+                PredictionMarketPlaceErrors::InvalidPrice
+            );
+            let diff = latest_price
+                .checked_sub(*current_price)
+                .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+
+            let percentage_change = diff
+                .checked_mul(10_000) // basis points
+                .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
+                .checked_div(*current_price)
+                .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+
+            let is_true = percentage_change <= (*percentage as i64 * 100);
+
+            if is_true {
+                1
+            } else {
+                0
+            }
+        }
     };
     market.final_outcome = Some(outcome);
     market.resolved = true;
