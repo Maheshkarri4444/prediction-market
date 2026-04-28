@@ -406,17 +406,18 @@ pub fn resolve_market(ctx: Context<ResolveMarket>) -> Result<()> {
                 *current_price > 0,
                 PredictionMarketPlaceErrors::InvalidPrice
             );
-            let diff = latest_price
-                .checked_sub(*current_price)
+
+            let diff = current_price
+                .checked_sub(latest_price)
                 .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
 
             let percentage_change = diff
-                .checked_mul(10_000) // basis points
+                .checked_mul(10_000)
                 .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
                 .checked_div(*current_price)
                 .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
 
-            let is_true = percentage_change <= (*percentage as i64 * 100);
+            let is_true = percentage_change >= (*percentage as i64 * 100);
 
             if is_true {
                 1
@@ -425,6 +426,7 @@ pub fn resolve_market(ctx: Context<ResolveMarket>) -> Result<()> {
             }
         }
     };
+
     market.final_outcome = Some(outcome);
     market.resolved = true;
 

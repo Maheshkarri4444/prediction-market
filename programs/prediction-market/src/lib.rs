@@ -9,6 +9,12 @@ pub use constants::*;
 pub use instructions::*;
 pub mod helper;
 pub use helper::*;
+
+pub mod dao_layer_instructions;
+pub use dao_layer_instructions::*;
+pub mod dao_layer_states;
+pub use dao_layer_states::*;
+
 declare_id!("9JcjW2redyHBkahstcNDvDJWd4zmPypDeufvS3NDeFyu");
 
 #[program]

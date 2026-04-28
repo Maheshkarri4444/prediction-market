@@ -86,3 +86,9 @@ pub enum PredictionMarketPlaceErrors {
     #[msg("Invalid Price")]
     InvalidPrice,
 }
+
+#[error_code]
+pub enum PredictionMarketDaoErrors {
+    #[msg("User is not the creator of the Preidctiom market place")]
+    CreatorMismatch,
+}
