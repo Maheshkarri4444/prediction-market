@@ -1,8 +1,9 @@
 use anchor_lang::prelude::*;
-use anchor_spl::{associated_token::AssociatedToken, token::{Mint, Token, TokenAccount}};
+use anchor_spl::{associated_token::AssociatedToken, token::{self, Mint, MintTo, Token, TokenAccount}};
 
-use crate::{Dao, DaoUser, MAX_USER, PredictionMarketDaoErrors,PredictionMarketPlaceErrors, PredictionMarketPlaceDetails};
-
+use crate::{Dao, DaoUser, MAX_USER, PredictionMarketDaoErrors, PredictionMarketPlaceDetails, PredictionMarketPlaceErrors};
+use mpl_token_metadata::{MAX_URI_LENGTH, instructions::CreateMetadataAccountV3};
+use mpl_token_metadata::types::DataV2;
 #[derive(Accounts)]
 pub struct InitializeDao<'info>{
     #[account(mut)]
@@ -99,10 +100,26 @@ pub struct AddFounder<'info> {
     #[account(
         init,
         payer = creator,
+        mint::authority = dao,
+        mint::decimals = 0,
+    )]
+    pub dao_nft_mint: Account<'info,Mint>,
+
+    #[account(
+        init,
+        payer = creator,
         associated_token::mint = dao_token_mint,
         associated_token::authority = founder,
     )]
     pub founder_token_account: Account<'info, TokenAccount>,
+
+    /// CHECK: metadata
+    #[account(mut)]
+    pub metadata: UncheckedAccount<'info>,
+
+    /// CHECK: Metaplex metadata program
+    #[account(address = mpl_token_metadata::ID)]
+    pub metadata_program: UncheckedAccount<'info>,
 
     pub associated_token_program: Program<'info,AssociatedToken>,
     pub token_program: Program<'info,Token>,
@@ -110,26 +127,93 @@ pub struct AddFounder<'info> {
     pub rent: Sysvar<'info , Rent>,
 }
 
-pub fn add_founder (ctx: Context<AddFounder>, username: String) -> Result<()> {
-    let creator = &mut ctx.accounts.creator;
+pub fn add_founder (ctx: Context<AddFounder>, username: String , symbol: String , uri: String) -> Result<()> {
+
     let founder = &mut ctx.accounts.founder;
     let dao_user = &mut ctx.accounts.dao_user;
+    let founder_token_account = &mut ctx.accounts.founder_token_account;
 
     let dao = &mut ctx.accounts.dao;
-    let dao_token_mint = &mut ctx.accounts.dao_token_mint;
+
+
+    require!(ctx.accounts.dao_nft_mint.supply == 0 , PredictionMarketDaoErrors::NftAlreadyMinted);
 
     require!(username.len() <= MAX_USER, PredictionMarketPlaceErrors::UsernameTooLong);
+    require!(symbol.len() <= MAX_USER , PredictionMarketDaoErrors::SymbolTooLong);
+    require!(uri.len() <= MAX_URI_LENGTH,PredictionMarketDaoErrors::UriTooLong);
 
-    // nft token mint to be added here 
-    // metaplex metadata thing to be added here
+
+    // DAO NFT 
+    let signer: &[&[u8]] = &[
+        b"prediction_market_dao",
+        &[dao.bump],
+    ];
+
+    let signer_seeds = &[signer];
+    token::mint_to(
+        CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(), 
+            MintTo { 
+                mint: ctx.accounts.dao_nft_mint.to_account_info(), 
+                to: founder_token_account.to_account_info(), 
+                authority: dao.to_account_info(), 
+            },
+            signer_seeds,
+        ), 
+        1
+    )?;
+
+
+    // metaplex metadata 
+    let name = username.clone();
+    let data = DataV2 {
+        name,
+        symbol,
+        uri,
+        seller_fee_basis_points: 500,
+        creators: None,
+        collection: None,
+        uses: None,
+    };
+
+    let ix = CreateMetadataAccountV3 {
+        metadata: ctx.accounts.metadata.key(),
+        mint: ctx.accounts.dao_nft_mint.key(),
+        mint_authority: dao.key(),
+        payer: ctx.accounts.creator.key(),
+        update_authority: (dao.key(), true),
+        system_program: ctx.accounts.system_program.key(),
+        rent: Some(ctx.accounts.rent.key()),
+    }
+    .instruction(
+        mpl_token_metadata::instructions::CreateMetadataAccountV3InstructionArgs {
+            data,
+            is_mutable: true,
+            collection_details: None,
+        },
+    );
+
+    anchor_lang::solana_program::program::invoke(
+        &ix,
+        &[
+            ctx.accounts.metadata_program.to_account_info(),
+            ctx.accounts.metadata.to_account_info(),
+            ctx.accounts.dao_nft_mint.to_account_info(),
+            dao.to_account_info(),
+            ctx.accounts.creator.to_account_info(),
+            ctx.accounts.system_program.to_account_info(),
+            ctx.accounts.rent.to_account_info(),
+        ],
+    )?;
 
     dao_user.username = username; 
     dao_user.pubkey = founder.key();
     dao_user.reputation = 10;
     dao_user.token_balance = 500; // 500 tokens to be minted.
     dao_user.total_actions = 0;
+    dao_user.bump = ctx.bumps.dao_user;
     dao.total_members += 1 as u64;
-    dao.bump = ctx.bumps.dao_user;
+
 
     Ok(())
 }

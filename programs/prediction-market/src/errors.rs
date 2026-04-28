@@ -91,4 +91,13 @@ pub enum PredictionMarketPlaceErrors {
 pub enum PredictionMarketDaoErrors {
     #[msg("User is not the creator of the Preidctiom market place")]
     CreatorMismatch,
+
+    #[msg("Symbol length too long")]
+    SymbolTooLong,
+
+    #[msg("Metadata uri length too long")]
+    UriTooLong,
+
+    #[msg("NFT already minted")]
+    NftAlreadyMinted,
 }
