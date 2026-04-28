@@ -1,3 +1,4 @@
+use crate::get_normalized_price;
 use crate::{
     market::Market, OptionDetails, PredictionMarketPlaceDetails, PredictionMarketPlaceErrors,
     QuestionType, CREATION_FEE, MAX_OUTCOMES, MAX_STRING, RESOLVE_REWARD,
@@ -47,6 +48,9 @@ pub struct CreateMarket<'info> {
     )]
     pub market_vault: UncheckedAccount<'info>,
 
+    /// CHECK: Price feed from pyth
+    pub price_feed: UncheckedAccount<'info>,
+
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
@@ -61,6 +65,8 @@ pub fn create_market(
     let market = &mut ctx.accounts.market;
     let prediction_market_vault = &mut ctx.accounts.prediction_market_vault;
     let prediction_market = &mut ctx.accounts.prediction_market_place;
+    let clock = Clock::get()?;
+    let price_feed_account = &mut ctx.accounts.price_feed;
     let num_options: u8;
     if let QuestionType::RangeOfPrice { options, .. } = &question_type {
         require!(
@@ -71,6 +77,54 @@ pub fn create_market(
     } else {
         num_options = 2;
     }
+
+    let question_type: QuestionType = match question_type {
+        QuestionType::PercentageUp {
+            price_feed,
+            percentage,
+            current_price: _,
+            time,
+        } => {
+            require!(
+                price_feed == price_feed_account.key(),
+                PredictionMarketPlaceErrors::PriceFeedMismatch
+            );
+
+            let normalized_price =
+                get_normalized_price(&price_feed_account, price_feed, clock.unix_timestamp)?;
+
+            QuestionType::PercentageUp {
+                price_feed,
+                percentage,
+                current_price: normalized_price,
+                time,
+            }
+        }
+
+        QuestionType::PercentageDown {
+            price_feed,
+            percentage,
+            current_price: _,
+            time,
+        } => {
+            require!(
+                price_feed == price_feed_account.key(),
+                PredictionMarketPlaceErrors::PriceFeedMismatch
+            );
+
+            let normalized_price =
+                get_normalized_price(&price_feed_account, price_feed, clock.unix_timestamp)?;
+
+            QuestionType::PercentageDown {
+                price_feed,
+                percentage,
+                current_price: normalized_price,
+                time,
+            }
+        }
+
+        _ => question_type,
+    };
 
     require!(
         question.len() <= MAX_STRING,
@@ -206,6 +260,8 @@ pub fn resolve_market(ctx: Context<ResolveMarket>) -> Result<()> {
         QuestionType::LessThanAtTime { price_feed, .. } => price_feed,
         QuestionType::RangeAtTime { price_feed, .. } => price_feed,
         QuestionType::RangeOfPrice { price_feed, .. } => price_feed,
+        QuestionType::PercentageUp { price_feed, .. } => price_feed,
+        QuestionType::PercentageDown { price_feed, .. } => price_feed,
     };
 
     let time = match market.question_type {
@@ -213,6 +269,8 @@ pub fn resolve_market(ctx: Context<ResolveMarket>) -> Result<()> {
         QuestionType::LessThanAtTime { time, .. } => time,
         QuestionType::RangeAtTime { time, .. } => time,
         QuestionType::RangeOfPrice { time, .. } => time,
+        QuestionType::PercentageUp { time, .. } => time,
+        QuestionType::PercentageDown { time, .. } => time,
     };
 
     require!(
@@ -308,6 +366,18 @@ pub fn resolve_market(ctx: Context<ResolveMarket>) -> Result<()> {
             }
             found.ok_or(PredictionMarketPlaceErrors::NoOutcome)?
         }
+        QuestionType::PercentageUp {
+            price_feed,
+            percentage,
+            current_price,
+            time,
+        } => {}
+        QuestionType::PercentageDown {
+            price_feed,
+            percentage,
+            current_price,
+            time,
+        } => {}
     };
     market.final_outcome = Some(outcome);
     market.resolved = true;

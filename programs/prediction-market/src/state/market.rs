@@ -25,7 +25,21 @@ pub enum QuestionType {
 
     RangeOfPrice {
         price_feed: Pubkey,
-        options: Vec<PriceOption>,
+        options: Vec<PriceOption>, // Maximum 5 options can be added
+        time: i64,
+    },
+
+    PercentageUp {
+        price_feed: Pubkey,
+        percentage: u8,
+        current_price: i64,
+        time: i64,
+    },
+
+    PercentageDown {
+        price_feed: Pubkey,
+        percentage: u8,
+        current_price: i64,
         time: i64,
     },
 }
