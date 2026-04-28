@@ -1,10 +1,10 @@
-use anchor_lang::{prelude::*, system_program::Transfer};
+use anchor_lang::{accounts::option, prelude::*, system_program::Transfer};
 use anchor_spl::{
     associated_token::AssociatedToken,
     token::{self, Burn, Mint, Token, TokenAccount},
 };
 
-use crate::{calculate_price, mint_tokens};
+use crate::{calculate_price, mint_tokens, QuestionType};
 use crate::{Market, Order, PredictionMarketPlaceErrors, User};
 #[derive(Accounts)]
 pub struct CreateOrder<'info> {
@@ -37,7 +37,7 @@ pub struct CreateOrder<'info> {
     )]
     pub order: Account<'info, Order>,
 
-    /// CHECK: pool vault for this market.
+    /// CHECK: vault for this market.
     #[account(
         mut,
         seeds = [b"market_vault", market.authority.as_ref(), market.key().as_ref()],
@@ -60,6 +60,10 @@ pub struct CreateOrder<'info> {
 pub fn create_order(ctx: Context<CreateOrder>, option: u8, quantity: u64) -> Result<()> {
     let order = &mut ctx.accounts.order;
     let market = &mut ctx.accounts.market;
+    require!(
+        option < market.num_options,
+        PredictionMarketPlaceErrors::InvalidOption
+    );
     let mut total_pool: u64 = 0;
     for (_, option) in market.options.iter().enumerate() {
         total_pool += option.pool_amount as u64;
@@ -164,47 +168,23 @@ pub struct ClaimWinningReward<'info> {
     )]
     pub market: Account<'info, Market>,
 
-    #[account(
-        mut,
-        address= market.yes_mint,
-    )]
-    pub yes_token_mint: Account<'info, Mint>,
-
-    #[account(
-        mut,
-        address = market.no_mint,
-    )]
-    pub no_token_mint: Account<'info, Mint>,
-
     /// CHECK: yes pool vault for this market.
     #[account(
         mut,
-        seeds = [b"yes_token_vault",market.key().as_ref(),yes_token_mint.key().as_ref()],
-        bump = market.yes_pool_vault_bump,
+        seeds = [b"market_vault", market.authority.as_ref(), market.key().as_ref()],
+        bump = market.vault_bump,
     )]
-    pub yes_pool_vault: UncheckedAccount<'info>,
+    pub market_vault: UncheckedAccount<'info>,
 
-    /// CHECK: no pool vault for this market.
-    #[account(
-        mut,
-        seeds = [b"no_token_vault",market.key().as_ref(),no_token_mint.key().as_ref()],
-        bump = market.no_pool_vault_bump,
-    )]
-    pub no_pool_vault: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub token_mint: Account<'info, Mint>,
 
     #[account(
         mut,
-        associated_token::mint = yes_token_mint,
+        associated_token::mint = token_mint,
         associated_token::authority = user,
     )]
-    pub yes_token_account: Account<'info, TokenAccount>,
-
-    #[account(
-        mut,
-        associated_token::mint = no_token_mint,
-        associated_token::authority = user,
-    )]
-    pub no_token_account: Account<'info, TokenAccount>,
+    pub token_account: Account<'info, TokenAccount>,
 
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
@@ -213,117 +193,81 @@ pub struct ClaimWinningReward<'info> {
 
 pub fn claim_winning_reward(ctx: Context<ClaimWinningReward>) -> Result<()> {
     let market = &mut ctx.accounts.market;
-    let yes_token_mint = &mut ctx.accounts.yes_token_mint;
-    let no_token_mint = &mut ctx.accounts.no_token_mint;
-    let yes_token_account = &mut ctx.accounts.yes_token_account;
-    let no_token_account = &mut ctx.accounts.no_token_account;
+    let token_mint = &mut ctx.accounts.token_mint;
+    let token_account = &mut ctx.accounts.token_account;
 
     let user = &ctx.accounts.user;
 
-    let yes_vault = &mut ctx.accounts.yes_pool_vault;
-    let no_vault = &mut ctx.accounts.no_pool_vault;
+    let market_vault = &mut ctx.accounts.market_vault;
 
     require!(
         market.resolved,
         PredictionMarketPlaceErrors::MarketNotYetResolved
     );
     require!(
-        market.outcome.is_some(),
+        market.vault == market_vault.key(),
+        PredictionMarketPlaceErrors::MarketVaultMismatch
+    );
+    require!(
+        market.final_outcome.is_some(),
         PredictionMarketPlaceErrors::NoOutcome
     );
-    let total_yes_tokens = yes_token_mint.supply;
-    let total_no_tokens = no_token_mint.supply;
 
-    let no_vault_account_info = no_vault.to_account_info();
-    let yes_vault_account_info = yes_vault.to_account_info();
+    let total_option_tokens = token_mint.supply;
+    require!(
+        total_option_tokens > 0,
+        PredictionMarketPlaceErrors::NoTokensInMint
+    );
+    let mut option_index: Option<u8> = None;
+    let mut total_pool = 0;
+    for (i, option) in market.options.iter().enumerate() {
+        if option.mint == token_mint.key() {
+            option_index = Some(i as u8);
+        }
+        total_pool += option.pool_amount as u64;
+    }
+    let option_index = option_index.ok_or(PredictionMarketPlaceErrors::TokenMintNotFound)?;
 
-    let no_vault_funds = no_vault.lamports();
-    let yes_vault_funds = yes_vault.lamports();
+    let market_vault_account_info = market_vault.to_account_info();
 
-    if let Some(outcome) = market.outcome {
+    if let Some(outcome) = market.final_outcome {
         let user_account_info = user.to_account_info();
-        let user_yes_tokens = yes_token_account.amount;
-        let user_no_tokens = no_token_account.amount;
-        {
+        let user_tokens = token_account.amount;
+        let user_reward = user_tokens
+            .checked_mul(total_pool)
+            .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
+            .checked_div(total_option_tokens)
+            .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+        let is_winning_option = outcome == option_index;
+        require!(
+            user_tokens != 0,
+            PredictionMarketPlaceErrors::NoTokensAvailable
+        );
+        if is_winning_option {
             let mut user_lamports = user_account_info.try_borrow_mut_lamports()?;
+            let mut market_vault_lamports = market_vault_account_info.try_borrow_mut_lamports()?;
+            require!(
+                **market_vault_lamports >= user_reward,
+                PredictionMarketPlaceErrors::InsufficientFundsInTreasury
+            );
 
-            if outcome {
-                require!(
-                    user_yes_tokens != 0,
-                    PredictionMarketPlaceErrors::NoTokensAvailable
-                );
-                let user_reward = user_yes_tokens
-                    .checked_mul(market.yes_pool_amount + market.no_pool_amount as u64)
-                    .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
-                    .checked_div(total_yes_tokens)
-                    .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
-
-                {
-                    let mut yes_vault_lamports =
-                        yes_vault_account_info.try_borrow_mut_lamports()?;
-                    let mut no_vault_lamports = no_vault_account_info.try_borrow_mut_lamports()?;
-
-                    if **no_vault_lamports != 0 {
-                        **no_vault_lamports =
-                            (**no_vault_lamports).checked_sub(no_vault_funds).unwrap();
-                        **yes_vault_lamports =
-                            (**yes_vault_lamports).checked_add(no_vault_funds).unwrap();
-                    }
-                    **yes_vault_lamports = (**yes_vault_lamports).checked_sub(user_reward).unwrap();
-                    **user_lamports = (**user_lamports).checked_add(user_reward).unwrap();
-                }
-            } else {
-                require!(
-                    user_no_tokens != 0,
-                    PredictionMarketPlaceErrors::NoTokensAvailable
-                );
-                let user_reward = user_no_tokens
-                    .checked_mul(market.no_pool_amount + market.yes_pool_amount as u64)
-                    .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
-                    .checked_div(total_no_tokens)
-                    .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
-                {
-                    let mut yes_vault_lamports =
-                        yes_vault_account_info.try_borrow_mut_lamports()?;
-                    let mut no_vault_lamports = no_vault_account_info.try_borrow_mut_lamports()?;
-
-                    if **yes_vault_lamports != 0 {
-                        **yes_vault_lamports =
-                            (**yes_vault_lamports).checked_sub(yes_vault_funds).unwrap();
-                        **no_vault_lamports =
-                            (**no_vault_lamports).checked_add(yes_vault_funds).unwrap();
-                    }
-
-                    **no_vault_lamports = (**no_vault_lamports)
-                        .checked_sub(user_reward)
-                        .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
-                    **user_lamports = (**user_lamports)
-                        .checked_add(user_reward)
-                        .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
-                }
-            }
+            **market_vault_lamports = (**market_vault_lamports)
+                .checked_sub(user_reward)
+                .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+            **user_lamports = (**user_lamports)
+                .checked_add(user_reward)
+                .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
         }
         token::burn(
             CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
                 Burn {
-                    mint: yes_token_mint.to_account_info(),
-                    from: yes_token_account.to_account_info(),
+                    mint: token_mint.to_account_info(),
+                    from: token_account.to_account_info(),
                     authority: user_account_info,
                 },
             ),
-            user_yes_tokens,
-        )?;
-        token::burn(
-            CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
-                Burn {
-                    mint: no_token_mint.to_account_info(),
-                    from: no_token_account.to_account_info(),
-                    authority: user.to_account_info(),
-                },
-            ),
-            user_no_tokens,
+            user_tokens,
         )?;
     }
     Ok(())

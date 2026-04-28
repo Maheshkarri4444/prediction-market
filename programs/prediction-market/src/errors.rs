@@ -62,6 +62,9 @@ pub enum PredictionMarketPlaceErrors {
     #[msg("User donot hold these tokens")]
     NoTokensAvailable,
 
+    #[msg("Not Tokens in the mint")]
+    NoTokensInMint,
+
     #[msg("Options Out of Range")]
     OptionsOutOfRange,
 
@@ -70,4 +73,13 @@ pub enum PredictionMarketPlaceErrors {
 
     #[msg("Token Mint mismatch")]
     TokenMintMismatch,
+
+    #[msg("Token Mint Not Found")]
+    TokenMintNotFound,
+
+    #[msg("Market Vault mismatch")]
+    MarketVaultMismatch,
+
+    #[msg("Invalid Option")]
+    InvalidOption,
 }
