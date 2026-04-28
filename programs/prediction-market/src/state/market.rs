@@ -73,6 +73,46 @@ pub struct Market {
     pub bump: u8,
 }
 
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
+pub enum EventQuestionType {
+    Binary {
+        time: i64,
+    },
+    Optioned {
+        options: Vec<EventOption>, // Maximum 5 options can be added
+        time: i64,
+    },
+}
+
+#[derive(Debug, AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
+pub struct EventOption {
+    pub option_name: String,
+}
+
+#[account]
+pub struct EventMarket {
+    pub id: u64,
+
+    pub authority: Pubkey,
+
+    pub question: String,
+
+    pub question_type: EventQuestionType,
+
+    pub num_options: u8,
+
+    pub options: Vec<OptionDetails>,
+    pub market_end_time: i64,
+
+    pub resolved: bool,
+    pub started: bool,
+    pub final_outcome: Option<u8>,
+
+    pub vault: Pubkey,
+    pub vault_bump: u8,
+    pub bump: u8,
+}
+
 impl Market {
     pub const LEN: usize = 262 as usize
         + 4 as usize

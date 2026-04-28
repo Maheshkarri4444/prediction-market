@@ -230,6 +230,7 @@ pub fn add_founder (ctx: Context<AddFounder>, username: String , symbol: String 
 
     dao_user.username = username; 
     dao_user.pubkey = founder.key();
+    dao_user.nft_mint = ctx.accounts.dao_nft_mint.key();
     dao_user.reputation = 10;
     dao_user.token_balance = 500; 
     dao_user.total_actions = 0;
