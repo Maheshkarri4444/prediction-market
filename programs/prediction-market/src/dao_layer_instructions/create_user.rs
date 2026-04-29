@@ -1,11 +1,11 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, system_program::Transfer};
 use anchor_spl::{
     associated_token::AssociatedToken,
     token::{self, Mint, MintTo, Token, TokenAccount},
 };
 use mpl_token_metadata::{instructions::CreateMetadataAccountV3, types::DataV2, MAX_URI_LENGTH};
 
-use crate::{PredictionMarketPlaceErrors};
+use crate::{PredictionMarketPlaceErrors, dao_user};
 use crate::{Dao, DaoUser, DAO_USER_CREATION_FEE};
 use crate::{PredictionMarketDaoErrors, MAX_USER};
 
@@ -194,11 +194,79 @@ pub fn create_user(
     dao_user.total_actions = 0;
     dao_user.stake_account_bump = ctx.bumps.dao_user_stake_account;
     dao_user.bump = ctx.bumps.dao_user;
-
+    dao_user.staked_amount = 0;
     dao.total_members += 1 as u64;
 
     Ok(())
 }
 
-// user stake function to be added 
+
+#[derive(Accounts)]
+pub struct DaoUserStake<'info> {
+    #[account(mut)]
+    pub user: Signer<'info>,
+
+    #[account(
+        mut,
+        seeds = [b"dao_user" , user.key().as_ref()],
+        bump = dao_user.bump,
+    )]
+    pub dao_user: Account<'info, DaoUser>,
+
+    /// CHECK: Dao user stake account
+    #[account(
+        mut,
+        seeds = [b"dao_user_stake_account", user.key().as_ref()],
+        bump = dao_user.stake_account_bump,
+    )]
+    pub dao_user_stake_account: UncheckedAccount<'info>,
+
+    pub system_program: Program<'info,System>,
+}
+
+pub fn dao_user_stake(ctx: Context<DaoUserStake>, amount: u64)-> Result<()> {
+    let user = &mut ctx.accounts.user;
+    let dao_user = &mut ctx.accounts.dao_user;
+    let dao_user_stake_account = &mut ctx.accounts.dao_user_stake_account;
+
+    require!(user.lamports() >= amount , PredictionMarketDaoErrors::InsufficientBalance);
+
+    anchor_lang::system_program::transfer(
+        CpiContext::new(
+            ctx.accounts.system_program.to_account_info(), 
+            Transfer { 
+                from: user.to_account_info(), 
+                to: dao_user_stake_account.to_account_info(), 
+            }
+        )
+        , amount
+    )?;
+
+    dao_user.staked_amount += amount as u64;
+
+    Ok(())
+}
+
 // user unstake function to be added
+#[derive(Accounts)]
+pub struct DaoUserUnstake<'info> {
+        #[account(mut)]
+    pub user: Signer<'info>,
+
+    #[account(
+        mut,
+        seeds = [b"dao_user" , user.key().as_ref()],
+        bump = dao_user.bump,
+    )]
+    pub dao_user: Account<'info, DaoUser>,
+
+    /// CHECK: Dao user stake account
+    #[account(
+        mut,
+        seeds = [b"dao_user_stake_account", user.key().as_ref()],
+        bump = dao_user.stake_account_bump,
+    )]
+    pub dao_user_stake_account: UncheckedAccount<'info>,
+
+    pub system_program: Program<'info,System>,
+}

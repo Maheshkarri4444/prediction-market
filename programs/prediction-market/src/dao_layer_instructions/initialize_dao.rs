@@ -201,8 +201,6 @@ pub fn add_founder (ctx: Context<AddFounder>, username: String , symbol: String 
         ],
     )?;
 
-
-
     dao_user.username = username; 
     dao_user.pubkey = founder.key();
     dao_user.nft_mint = ctx.accounts.dao_nft_mint.key();
@@ -211,6 +209,8 @@ pub fn add_founder (ctx: Context<AddFounder>, username: String , symbol: String 
     dao_user.total_actions = 0;
     dao_user.stake_account_bump = ctx.bumps.dao_user_stake_account;
     dao_user.bump = ctx.bumps.dao_user;
+    dao_user.staked_amount = 0;
+    dao_user.stake_locked = false;
     dao.total_members += 1 as u64;
 
     Ok(())

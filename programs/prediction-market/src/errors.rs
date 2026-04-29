@@ -118,4 +118,7 @@ pub enum PredictionMarketDaoErrors {
 
     #[msg("66% is not reached by the winning option")]
     WinnerNotReachedWinningAmount,
+
+    #[msg("Insufficient Funds to stake")]
+    InsufficientFundsToStake,
 }
