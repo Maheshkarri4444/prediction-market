@@ -29,7 +29,7 @@ pub struct CreateEventMarket<'info> {
         init,
         payer = creator,
         space = 8,
-        seeds = [b"market_vault", market.authority.as_ref(), market.key().as_ref()],
+        seeds = [b"event_market_vault", market.authority.as_ref(), market.key().as_ref()],
         bump,
     )]
     pub market_vault: UncheckedAccount<'info>,

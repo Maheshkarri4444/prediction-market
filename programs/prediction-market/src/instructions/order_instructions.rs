@@ -13,7 +13,7 @@ pub struct CreateOrder<'info> {
 
     #[account(
         mut,
-        seeds = [b"user_v1", user.pubkey.as_ref()],  
+        seeds = [b"user_v1", buyer.key().as_ref()],  
         bump = user.bump,
     )]
     pub user: Box<Account<'info, User>>,
