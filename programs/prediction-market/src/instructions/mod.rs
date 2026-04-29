@@ -11,3 +11,6 @@ pub use event_market_instructions::*;
 
 pub mod event_order_instructions;
 pub use event_order_instructions::*;
+
+pub mod event_resolution;
+pub use event_resolution::*;
