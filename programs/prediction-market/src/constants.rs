@@ -9,3 +9,6 @@ pub const RESOLVE_REWARD: u64 =
     CREATION_FEE as u64 - (1 * LAMPORTS_PER_SOL as u64).checked_div(40).unwrap() as u64;
 pub const MAX_USER: usize = 30;
 pub const MAX_OUTCOMES: usize = 5;
+
+pub const QUARUM: u8 = 50;
+pub const WINNING_STAKE: u8 = 66;

@@ -109,4 +109,13 @@ pub enum PredictionMarketDaoErrors {
 
     #[msg("Event not yet ended")]
     NotYetEnded,
+
+    #[msg("Event Did not END")]
+    EventDidNotEnd,
+
+    #[msg("Quarum not reached")]
+    QuarumNotReached,
+
+    #[msg("66% is not reached by the winning option")]
+    WinnerNotReachedWinningAmount,
 }

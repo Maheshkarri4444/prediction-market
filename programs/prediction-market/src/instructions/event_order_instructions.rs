@@ -61,7 +61,6 @@ pub struct CreateEventOrder<'info> {
 
 pub fn create_event_order(ctx: Context<CreateEventOrder>, option: u8, quantity: u64) -> Result<()> {
     let buyer = &mut ctx.accounts.buyer;
-    let user = &mut ctx.accounts.user;
     let market = &mut ctx.accounts.market;
     let mut total_pool: u64 = 0;
     for (_, option) in market.options.iter().enumerate() {

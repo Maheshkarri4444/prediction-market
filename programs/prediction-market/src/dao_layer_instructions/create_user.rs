@@ -199,3 +199,6 @@ pub fn create_user(
 
     Ok(())
 }
+
+// user stake function to be added 
+// user unstake function to be added
