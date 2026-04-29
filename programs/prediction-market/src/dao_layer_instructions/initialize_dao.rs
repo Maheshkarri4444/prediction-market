@@ -63,6 +63,7 @@ pub fn initialize_dao(ctx: Context<InitializeDao>)->Result<()>{
     dao.total_members = 0;
     dao.total_events = 0;
     dao.vault_bump = ctx.bumps.dao_vault;
+    dao.dao_current_stake = 0;
     dao.bump = ctx.bumps.dao;
 
     Ok(())
@@ -84,18 +85,22 @@ pub struct AddFounder<'info> {
     )]
     pub dao_user: Account<'info , DaoUser>,
 
+    /// CHECK: Dao user stake account
+    #[account(
+        init,
+        payer = creator,
+        space = 8,
+        seeds = [b"dao_user_stake_account",founder.key().as_ref()],
+        bump 
+    )]
+    pub dao_user_stake_account: UncheckedAccount<'info>,
+
     #[account(
         mut,
         seeds = [b"prediction_market_dao"],
         bump = dao.bump,
     )]
     pub dao: Account<'info , Dao>,
-
-    #[account(
-        mut,
-        address = dao.token_mint,
-    )]
-    pub dao_token_mint: Account<'info,Mint>,
 
     #[account(
         init,
@@ -105,13 +110,6 @@ pub struct AddFounder<'info> {
     )]
     pub dao_nft_mint: Account<'info,Mint>,
 
-    #[account(
-        init,
-        payer = creator,
-        associated_token::mint = dao_token_mint,
-        associated_token::authority = founder,
-    )]
-    pub founder_token_account: Account<'info, TokenAccount>,
 
     #[account(
         init,
@@ -136,10 +134,9 @@ pub struct AddFounder<'info> {
 }
 
 pub fn add_founder (ctx: Context<AddFounder>, username: String , symbol: String , uri: String) -> Result<()> {
-
     let founder = &mut ctx.accounts.founder;
     let dao_user = &mut ctx.accounts.dao_user;
-    let founder_token_account = &mut ctx.accounts.founder_token_account;
+    let dao_user_stake_account = &mut ctx.accounts.dao_user_stake_account;
     let founder_nft_account = &mut ctx.accounts.founder_nft_account;
     let dao = &mut ctx.accounts.dao;
 
@@ -178,7 +175,7 @@ pub fn add_founder (ctx: Context<AddFounder>, username: String , symbol: String 
         name,
         symbol,
         uri,
-        seller_fee_basis_points: 500,
+        seller_fee_basis_points: 0,
         creators: None,
         collection: None,
         uses: None,
@@ -214,29 +211,16 @@ pub fn add_founder (ctx: Context<AddFounder>, username: String , symbol: String 
         ],
     )?;
 
-    // 500 tokens to be minted
-    token::mint_to(
-        CpiContext::new(
-            ctx.accounts.token_program.to_account_info(), 
-            MintTo { 
-                mint: ctx.accounts.dao_token_mint.to_account_info(), 
-                to: founder_token_account.to_account_info(), 
-                authority: dao.to_account_info(),
-            }
-        ), 
-        200
-    )?;
 
 
     dao_user.username = username; 
     dao_user.pubkey = founder.key();
     dao_user.nft_mint = ctx.accounts.dao_nft_mint.key();
+    dao_user.user_stake_account = dao_user_stake_account.key();
     dao_user.reputation = 20;
-    dao_user.token_balance = 200; 
     dao_user.total_actions = 0;
     dao_user.bump = ctx.bumps.dao_user;
     dao.total_members += 1 as u64;
-
-
+    
     Ok(())
 }

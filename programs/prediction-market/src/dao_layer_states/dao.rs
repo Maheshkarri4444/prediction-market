@@ -8,10 +8,11 @@ pub struct Dao {
     pub total_events: u64,
     pub total_members: u64,
     pub dao_status: bool, // live when all the founders are added.
+    pub dao_current_stake: u64,
     pub vault_bump: u8,
     pub bump: u8,
 }
 
 impl Dao {
-    pub const LEN: usize = 115;
+    pub const LEN: usize = 123;
 }

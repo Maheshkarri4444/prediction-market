@@ -38,11 +38,15 @@ pub struct CreateDaoUser<'info> {
     )]
     pub dao_user: Account<'info, DaoUser>,
 
+    /// CHECK: Dao user stake account
     #[account(
-        mut,
-        address = dao.token_mint,
+        init,
+        payer = user,
+        space = 8,
+        seeds = [b"dao_user_stake_account", user.key().as_ref()],
+        bump 
     )]
-    pub dao_token_mint: Account<'info, Mint>,
+    pub dao_user_stake_account: UncheckedAccount<'info>,
 
     #[account(
         init,
@@ -51,14 +55,6 @@ pub struct CreateDaoUser<'info> {
         mint::decimals = 0,
     )]
     pub dao_nft_mint: Account<'info, Mint>,
-
-    #[account(
-        init,
-        payer = user,
-        associated_token::mint = dao_token_mint,
-        associated_token::authority = user,
-    )]
-    pub user_token_account: Account<'info, TokenAccount>,
 
     #[account(
         init,
@@ -91,7 +87,7 @@ pub fn create_user(
     let dao = &mut ctx.accounts.dao;
     let user = &mut ctx.accounts.user;
     let dao_user = &mut ctx.accounts.dao_user;
-    let user_token_account = &mut ctx.accounts.user_token_account;
+    let user_stake_account = &mut ctx.accounts.dao_user_stake_account;
     let user_nft_account = &mut ctx.accounts.user_nft_account;
 
     require!(
@@ -154,7 +150,7 @@ pub fn create_user(
         name,
         symbol,
         uri,
-        seller_fee_basis_points: 500,
+        seller_fee_basis_points: 0,
         creators: None,
         collection: None,
         uses: None,
@@ -190,24 +186,11 @@ pub fn create_user(
         ],
     )?;
 
-    // 100 tokens to be minted
-    token::mint_to(
-        CpiContext::new(
-            ctx.accounts.token_program.to_account_info(),
-            MintTo {
-                mint: ctx.accounts.dao_token_mint.to_account_info(),
-                to: user_token_account.to_account_info(),
-                authority: dao.to_account_info(),
-            },
-        ),
-        100,
-    )?;
-
     dao_user.username = username;
     dao_user.pubkey = ctx.accounts.user.key();
     dao_user.nft_mint = ctx.accounts.dao_nft_mint.key();
+    dao_user.user_stake_account = user_stake_account.key();
     dao_user.reputation = 10;
-    dao_user.token_balance = 100;
     dao_user.total_actions = 0;
     dao_user.bump = ctx.bumps.dao_user;
 

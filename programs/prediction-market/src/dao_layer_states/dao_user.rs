@@ -7,11 +7,12 @@ pub struct DaoUser {
     pub pubkey: Pubkey,
     pub nft_mint: Pubkey,
     pub total_actions: u64,
-    pub token_balance: u64,
+    pub user_stake_account: Pubkey,
     pub reputation: u64,
+    pub stake_account_bump: u8,
     pub bump: u8,
 }
 
 impl DaoUser {
-    pub const LEN: usize = MAX_USER as usize + 94;
+    pub const LEN: usize = MAX_USER as usize + 94 + 33 as usize;
 }
