@@ -121,4 +121,10 @@ pub enum PredictionMarketDaoErrors {
 
     #[msg("Insufficient Funds to stake")]
     InsufficientFundsToStake,
+
+    #[msg("Insufficient funds in stake account")]
+    InsufficientFundsInStakeAccount,
+
+    #[msg("Stake account locked")]
+    StakeAccountLocked,
 }

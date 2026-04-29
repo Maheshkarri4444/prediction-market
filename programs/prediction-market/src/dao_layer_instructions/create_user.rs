@@ -247,7 +247,6 @@ pub fn dao_user_stake(ctx: Context<DaoUserStake>, amount: u64)-> Result<()> {
     Ok(())
 }
 
-// user unstake function to be added
 #[derive(Accounts)]
 pub struct DaoUserUnstake<'info> {
         #[account(mut)]
@@ -269,4 +268,31 @@ pub struct DaoUserUnstake<'info> {
     pub dao_user_stake_account: UncheckedAccount<'info>,
 
     pub system_program: Program<'info,System>,
+}
+
+pub fn dao_user_unstake(ctx:Context<DaoUserUnstake> ,  amount: u64) -> Result<()> {
+    let user = &mut ctx.accounts.user;
+    let dao_user = &mut ctx.accounts.dao_user;
+    let dao_user_stake_account = &mut ctx.accounts.dao_user_stake_account;
+
+    require!(dao_user.user_stake_account == dao_user_stake_account.key() ,PredictionMarketDaoErrors::StakeAccountMismatch );
+    require!(dao_user_stake_account.lamports() >= amount , PredictionMarketDaoErrors::InsufficientFundsInStakeAccount);
+    require!(!dao_user.stake_locked , PredictionMarketDaoErrors::StakeAccountLocked);
+ 
+    {
+
+        let user_info = user.to_account_info();
+        let stake_account_info = dao_user_stake_account.to_account_info();
+
+        let mut user_lamports = user_info.try_borrow_mut_lamports()?;
+        let mut stake_account_lamports = stake_account_info.try_borrow_mut_lamports()?;
+
+        **stake_account_lamports = (**stake_account_lamports).checked_sub(amount).ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+        **user_lamports = (**user_lamports).checked_add(amount).ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+
+    }
+
+    dao_user.staked_amount -= amount as u64;
+
+    Ok(())
 }
