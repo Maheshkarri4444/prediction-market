@@ -6,3 +6,5 @@ pub mod order_instructions;
 pub use order_instructions::*;
 pub mod create_user;
 pub use create_user::*;
+pub mod event_market_instructions;
+pub use event_market_instructions::*;

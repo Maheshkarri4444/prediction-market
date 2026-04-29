@@ -137,16 +137,17 @@ pub struct EventMarket {
 
     pub num_options: u8,
 
-    pub options: Vec<OptionDetails>,
+    pub options: Vec<EventOptionDetails>,
     pub market_end_time: i64,
     pub event_end_time: i64,
 
     pub resolved: bool,
     pub started: bool,
+    pub voting_status: VotingStatus,
     pub final_outcome: Option<u8>,
 
-    pub voting_state: VotingStatus,
     pub vault: Pubkey,
+
     pub vault_bump: u8,
     pub bump: u8,
 }
@@ -163,4 +164,17 @@ pub struct EventOptionDetails {
     pub virtual_pool_amount: u64,
     pub pool_amount: u64,
     pub stake_voted: u64,
+}
+
+impl EventOptionDetails {
+    pub fn new() -> EventOptionDetails {
+        EventOptionDetails {
+            market: Pubkey::default(),
+            option_id: 0,
+            mint: Pubkey::default(),
+            virtual_pool_amount: 0,
+            pool_amount: 0,
+            stake_voted: 0,
+        }
+    }
 }

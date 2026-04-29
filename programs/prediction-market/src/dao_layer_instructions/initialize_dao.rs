@@ -35,14 +35,6 @@ pub struct InitializeDao<'info>{
     )]
     pub dao_vault: UncheckedAccount<'info>,
 
-    #[account(
-        init,
-        payer = creator,
-        mint::authority = dao,
-        mint::decimals = 6,
-    )]
-    pub mint: Account<'info,Mint>,
-
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info , Token>,
     pub rent: Sysvar<'info , Rent>,
@@ -52,18 +44,16 @@ pub fn initialize_dao(ctx: Context<InitializeDao>)->Result<()>{
     let prediction_market_place  = &mut ctx.accounts.prediction_market_place;
     let dao = &mut ctx.accounts.dao;
     let dao_vault = &mut ctx.accounts.dao_vault;
-    let mint = &mut ctx.accounts.mint;
     let creator = &mut ctx.accounts.creator;
 
     require!(creator.key() == prediction_market_place.creator , PredictionMarketDaoErrors::CreatorMismatch);
 
     dao.creator = creator.key();
-    dao.token_mint = mint.key();
     dao.vault = dao_vault.key();
     dao.total_members = 0;
     dao.total_events = 0;
     dao.vault_bump = ctx.bumps.dao_vault;
-    dao.dao_current_stake = 0;
+    dao.dao_total_stake = 0;
     dao.bump = ctx.bumps.dao;
 
     Ok(())
@@ -219,8 +209,9 @@ pub fn add_founder (ctx: Context<AddFounder>, username: String , symbol: String 
     dao_user.user_stake_account = dao_user_stake_account.key();
     dao_user.reputation = 20;
     dao_user.total_actions = 0;
+    dao_user.stake_account_bump = ctx.bumps.dao_user_stake_account;
     dao_user.bump = ctx.bumps.dao_user;
     dao.total_members += 1 as u64;
-    
+
     Ok(())
 }

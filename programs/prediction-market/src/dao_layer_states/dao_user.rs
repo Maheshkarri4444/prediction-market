@@ -7,6 +7,7 @@ pub struct DaoUser {
     pub pubkey: Pubkey,
     pub nft_mint: Pubkey,
     pub total_actions: u64,
+    pub total_votes: u64,
     pub user_stake_account: Pubkey,
     pub reputation: u64,
     pub stake_account_bump: u8,

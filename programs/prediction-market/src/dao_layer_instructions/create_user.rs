@@ -5,7 +5,7 @@ use anchor_spl::{
 };
 use mpl_token_metadata::{instructions::CreateMetadataAccountV3, types::DataV2, MAX_URI_LENGTH};
 
-use crate::PredictionMarketPlaceErrors;
+use crate::{PredictionMarketPlaceErrors};
 use crate::{Dao, DaoUser, DAO_USER_CREATION_FEE};
 use crate::{PredictionMarketDaoErrors, MAX_USER};
 
@@ -192,6 +192,7 @@ pub fn create_user(
     dao_user.user_stake_account = user_stake_account.key();
     dao_user.reputation = 10;
     dao_user.total_actions = 0;
+    dao_user.stake_account_bump = ctx.bumps.dao_user_stake_account;
     dao_user.bump = ctx.bumps.dao_user;
 
     dao.total_members += 1 as u64;

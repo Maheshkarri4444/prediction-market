@@ -51,7 +51,6 @@ pub struct CreateMarket<'info> {
     /// CHECK: Price feed from pyth
     pub price_feed: UncheckedAccount<'info>,
 
-    pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
 }
@@ -68,6 +67,11 @@ pub fn create_market(
     let clock = Clock::get()?;
     let price_feed_account = &mut ctx.accounts.price_feed;
     let num_options: u8;
+
+    require!(
+        question.len() <= MAX_STRING,
+        PredictionMarketPlaceErrors::LengthTooLong
+    );
     if let QuestionType::RangeOfPrice { options, .. } = &question_type {
         require!(
             options.len() < MAX_OUTCOMES,
@@ -125,11 +129,6 @@ pub fn create_market(
 
         _ => question_type,
     };
-
-    require!(
-        question.len() <= MAX_STRING,
-        PredictionMarketPlaceErrors::LengthTooLong
-    );
 
     require!(
         ctx.accounts.creator.lamports() >= CREATION_FEE,
