@@ -19,7 +19,7 @@ pub struct CreateEventMarket<'info> {
         init,
         payer = creator,
         space = 8 + EventMarket::LEN,
-        seeds = [b"market", creator.key().as_ref() , &(prediction_market_place.total_markets + 1).to_le_bytes()],
+        seeds = [b"event_market", creator.key().as_ref() , &(prediction_market_place.total_markets + 1).to_le_bytes()],
         bump,
     )]
     pub market: Account<'info, EventMarket>,
@@ -130,7 +130,7 @@ pub struct AddEventOptionDetails<'info> {
 
     #[account(
         mut,
-        seeds = [b"market", creator.key().as_ref() , &market.id.to_le_bytes()],
+        seeds = [b"event_market", creator.key().as_ref() , &market.id.to_le_bytes()],
         bump = market.bump
     )]
     pub market: Account<'info , EventMarket>,

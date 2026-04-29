@@ -103,4 +103,10 @@ pub enum PredictionMarketDaoErrors {
 
     #[msg("User has balance less than Creation fee")]
     InsufficientBalance,
+
+    #[msg("Stake account mismatch")]
+    StakeAccountMismatch,
+
+    #[msg("Event not yet ended")]
+    NotYetEnded,
 }

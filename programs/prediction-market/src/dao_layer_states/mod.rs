@@ -3,3 +3,6 @@ pub use dao::*;
 
 pub mod dao_user;
 pub use dao_user::*;
+
+pub mod vote;
+pub use vote::*;

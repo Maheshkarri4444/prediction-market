@@ -1,10 +1,10 @@
-use anchor_lang::{accounts::option, prelude::*, system_program::Transfer};
+use anchor_lang::{prelude::*, system_program::Transfer};
 use anchor_spl::{
     associated_token::AssociatedToken,
     token::{self, Burn, Mint, Token, TokenAccount},
 };
 
-use crate::{calculate_price, mint_tokens, QuestionType};
+use crate::{calculate_price, mint_tokens};
 use crate::{Market, Order, PredictionMarketPlaceErrors, User};
 #[derive(Accounts)]
 pub struct CreateOrder<'info> {
