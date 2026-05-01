@@ -78,7 +78,7 @@ pub struct CreateDaoUser<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
-pub fn create_user(
+pub fn create_dao_user(
     ctx: Context<CreateDaoUser>,
     username: String,
     symbol: String,
