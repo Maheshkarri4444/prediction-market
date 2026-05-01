@@ -133,4 +133,10 @@ pub enum PredictionMarketDaoErrors {
 
     #[msg("Dao user account locked")]
     AccountLocked,
+
+    #[msg("Insufficient free amount to unstake")]
+    InsufficientFreeAmount,
+
+    #[msg("Insufficient free amount to vote")]
+    InsufficientFreeAmountToVote,
 }

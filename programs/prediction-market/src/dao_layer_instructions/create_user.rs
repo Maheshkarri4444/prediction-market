@@ -192,7 +192,9 @@ pub fn create_user(
     dao_user.reputation = 10;
     dao_user.total_actions = 0;
     dao_user.bump = ctx.bumps.dao_user;
-    dao_user.stake_amount = 0;
+    dao_user.total_stake = 0;
+    dao_user.free_amount = 0;
+    dao_user.locked_amount = 0;
     dao.total_members += 1 as u64;
 
     Ok(())
@@ -247,7 +249,8 @@ pub fn dao_user_stake(ctx: Context<DaoUserStake>, amount: u64)-> Result<()> {
         , amount
     )?;
 
-    dao_user.stake_amount += amount as u64;
+    dao_user.total_stake += amount as u64;
+    dao_user.free_amount += amount as u64;
 
     Ok(())
 }
@@ -290,8 +293,8 @@ pub fn dao_user_unstake(ctx:Context<DaoUserUnstake> ,  amount: u64) -> Result<()
 
 
     require!(dao_stake_account.lamports() >= amount , PredictionMarketDaoErrors::InsufficientFundsInStakeAccount);
-    require!(!dao_user.stake_locked , PredictionMarketDaoErrors::AccountLocked);
- 
+    require!(dao_user.free_amount >= amount , PredictionMarketDaoErrors::InsufficientFreeAmount);
+
     {
 
         let user_info = user.to_account_info();
@@ -305,7 +308,8 @@ pub fn dao_user_unstake(ctx:Context<DaoUserUnstake> ,  amount: u64) -> Result<()
 
     }
 
-    dao_user.stake_amount -= amount as u64;
+    dao_user.total_stake -= amount as u64;
+    dao_user.free_amount -= amount as u64;
 
     Ok(())
 }

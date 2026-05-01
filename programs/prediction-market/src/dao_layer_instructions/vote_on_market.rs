@@ -41,7 +41,7 @@ pub struct VoteOnMarket<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
-pub fn vote_on_market(ctx:Context<VoteOnMarket> , option_id: u8)->Result<()> {
+pub fn vote_on_market(ctx:Context<VoteOnMarket> , option_id: u8 , stake: u64)->Result<()> {
     let market = &mut ctx.accounts.market;
     let vote = &mut ctx.accounts.vote;
     let dao_user = &mut ctx.accounts.dao_user;
@@ -50,14 +50,13 @@ pub fn vote_on_market(ctx:Context<VoteOnMarket> , option_id: u8)->Result<()> {
 
     require!(clock.unix_timestamp >= market.event_end_time , PredictionMarketDaoErrors::NotYetEnded);
     require!(market.voting_status != VotingStatus::Ended , PredictionMarketDaoErrors::VotingEnded);
+    require!(dao_user.free_amount >= stake ,PredictionMarketDaoErrors::InsufficientFreeAmountToVote );
 
     if market.voting_status != VotingStatus::Active {
         market.voting_status = VotingStatus::Active;
     }
 
     require!(option_id < market.num_options, PredictionMarketPlaceErrors::InvalidOption );
-
-    let stake = dao_user.stake_amount;
 
     let selected_option = &mut market.options[option_id as usize];
 
@@ -68,8 +67,12 @@ pub fn vote_on_market(ctx:Context<VoteOnMarket> , option_id: u8)->Result<()> {
 
     vote.market = market.key();
     vote.voter = ctx.accounts.voter.key();
+    vote.stake_voted = stake;
     vote.option_id = option_id;
     vote.bump = ctx.bumps.vote;
+
+    dao_user.locked_amount += stake as u64;
+    dao_user.free_amount -= stake as u64;
 
     Ok(())
 }
