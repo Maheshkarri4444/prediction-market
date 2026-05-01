@@ -189,12 +189,10 @@ pub fn create_user(
     dao_user.username = username;
     dao_user.pubkey = ctx.accounts.user.key();
     dao_user.nft_mint = ctx.accounts.dao_nft_mint.key();
-    dao_user.user_stake_account = user_stake_account.key();
     dao_user.reputation = 10;
     dao_user.total_actions = 0;
-    dao_user.stake_account_bump = ctx.bumps.dao_user_stake_account;
     dao_user.bump = ctx.bumps.dao_user;
-    dao_user.staked_amount = 0;
+    dao_user.stake_amount = 0;
     dao.total_members += 1 as u64;
 
     Ok(())
@@ -213,13 +211,20 @@ pub struct DaoUserStake<'info> {
     )]
     pub dao_user: Account<'info, DaoUser>,
 
+    #[account(
+        mut,  
+        seeds = [b"prediction_market_dao"],
+        bump = dao.bump,
+    )]
+    pub dao: Account<'info , Dao>,
+
     /// CHECK: Dao user stake account
     #[account(
         mut,
-        seeds = [b"dao_user_stake_account", user.key().as_ref()],
-        bump = dao_user.stake_account_bump,
+        seeds = [b"prediction_market_dao_stake_account"],
+        bump = dao.stake_account_bump,
     )]
-    pub dao_user_stake_account: UncheckedAccount<'info>,
+    pub dao_stake_account: UncheckedAccount<'info>,
 
     pub system_program: Program<'info,System>,
 }
@@ -227,7 +232,7 @@ pub struct DaoUserStake<'info> {
 pub fn dao_user_stake(ctx: Context<DaoUserStake>, amount: u64)-> Result<()> {
     let user = &mut ctx.accounts.user;
     let dao_user = &mut ctx.accounts.dao_user;
-    let dao_user_stake_account = &mut ctx.accounts.dao_user_stake_account;
+    let dao_stake_account = &mut ctx.accounts.dao_stake_account;
 
     require!(user.lamports() >= amount , PredictionMarketDaoErrors::InsufficientBalance);
 
@@ -236,20 +241,20 @@ pub fn dao_user_stake(ctx: Context<DaoUserStake>, amount: u64)-> Result<()> {
             ctx.accounts.system_program.to_account_info(), 
             Transfer { 
                 from: user.to_account_info(), 
-                to: dao_user_stake_account.to_account_info(), 
+                to: dao_stake_account.to_account_info(), 
             }
         )
         , amount
     )?;
 
-    dao_user.staked_amount += amount as u64;
+    dao_user.stake_amount += amount as u64;
 
     Ok(())
 }
 
 #[derive(Accounts)]
 pub struct DaoUserUnstake<'info> {
-        #[account(mut)]
+    #[account(mut)]
     pub user: Signer<'info>,
 
     #[account(
@@ -259,13 +264,21 @@ pub struct DaoUserUnstake<'info> {
     )]
     pub dao_user: Account<'info, DaoUser>,
 
+    #[account(
+        mut,  
+        seeds = [b"prediction_market_dao"],
+        bump = dao.bump,
+    )]
+    pub dao: Account<'info , Dao>,
+
     /// CHECK: Dao user stake account
     #[account(
         mut,
-        seeds = [b"dao_user_stake_account", user.key().as_ref()],
-        bump = dao_user.stake_account_bump,
+        seeds = [b"prediction_market_dao_stake_account"],
+        bump = dao.stake_account_bump,
     )]
-    pub dao_user_stake_account: UncheckedAccount<'info>,
+    pub dao_stake_account: UncheckedAccount<'info>,
+
 
     pub system_program: Program<'info,System>,
 }
@@ -273,16 +286,16 @@ pub struct DaoUserUnstake<'info> {
 pub fn dao_user_unstake(ctx:Context<DaoUserUnstake> ,  amount: u64) -> Result<()> {
     let user = &mut ctx.accounts.user;
     let dao_user = &mut ctx.accounts.dao_user;
-    let dao_user_stake_account = &mut ctx.accounts.dao_user_stake_account;
+    let dao_stake_account = &mut ctx.accounts.dao_stake_account;
 
-    require!(dao_user.user_stake_account == dao_user_stake_account.key() ,PredictionMarketDaoErrors::StakeAccountMismatch );
-    require!(dao_user_stake_account.lamports() >= amount , PredictionMarketDaoErrors::InsufficientFundsInStakeAccount);
-    require!(!dao_user.stake_locked , PredictionMarketDaoErrors::StakeAccountLocked);
+
+    require!(dao_stake_account.lamports() >= amount , PredictionMarketDaoErrors::InsufficientFundsInStakeAccount);
+    require!(!dao_user.stake_locked , PredictionMarketDaoErrors::AccountLocked);
  
     {
 
         let user_info = user.to_account_info();
-        let stake_account_info = dao_user_stake_account.to_account_info();
+        let stake_account_info = dao_stake_account.to_account_info();
 
         let mut user_lamports = user_info.try_borrow_mut_lamports()?;
         let mut stake_account_lamports = stake_account_info.try_borrow_mut_lamports()?;
@@ -292,7 +305,7 @@ pub fn dao_user_unstake(ctx:Context<DaoUserUnstake> ,  amount: u64) -> Result<()
 
     }
 
-    dao_user.staked_amount -= amount as u64;
+    dao_user.stake_amount -= amount as u64;
 
     Ok(())
 }

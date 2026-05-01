@@ -10,5 +10,5 @@ pub const RESOLVE_REWARD: u64 =
 pub const MAX_USER: usize = 30;
 pub const MAX_OUTCOMES: usize = 5;
 
-pub const QUARUM: u8 = 50;
-pub const WINNING_STAKE: u8 = 66;
+pub const QUARUM: u8 = 10; // min 10 % of the total stake to be voted on the market.
+pub const WINNING_STAKE: u8 = 50; // min 50% voted stake should be on the winning side.

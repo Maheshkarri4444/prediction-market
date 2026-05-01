@@ -35,6 +35,16 @@ pub struct InitializeDao<'info>{
     )]
     pub dao_vault: UncheckedAccount<'info>,
 
+    /// CHECK: Dao stake account
+    #[account(
+        init,
+        payer = creator,
+        space = 8,
+        seeds = [b"prediction_market_dao_stake_account"],
+        bump 
+    )]
+    pub dao_stake_account: UncheckedAccount<'info>,
+
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info , Token>,
     pub rent: Sysvar<'info , Rent>,
@@ -44,6 +54,7 @@ pub fn initialize_dao(ctx: Context<InitializeDao>)->Result<()>{
     let prediction_market_place  = &mut ctx.accounts.prediction_market_place;
     let dao = &mut ctx.accounts.dao;
     let dao_vault = &mut ctx.accounts.dao_vault;
+    let dao_stake_account = &mut ctx.accounts.dao_stake_account;
     let creator = &mut ctx.accounts.creator;
 
     require!(creator.key() == prediction_market_place.creator , PredictionMarketDaoErrors::CreatorMismatch);
@@ -52,8 +63,10 @@ pub fn initialize_dao(ctx: Context<InitializeDao>)->Result<()>{
     dao.vault = dao_vault.key();
     dao.total_members = 0;
     dao.total_events = 0;
-    dao.vault_bump = ctx.bumps.dao_vault;
     dao.dao_total_stake = 0;
+    dao.dao_stake_account = dao_stake_account.key();
+    dao.stake_account_bump = ctx.bumps.dao_stake_account;
+    dao.vault_bump = ctx.bumps.dao_vault;
     dao.bump = ctx.bumps.dao;
 
     Ok(())
@@ -204,12 +217,10 @@ pub fn add_founder (ctx: Context<AddFounder>, username: String , symbol: String 
     dao_user.username = username; 
     dao_user.pubkey = founder.key();
     dao_user.nft_mint = ctx.accounts.dao_nft_mint.key();
-    dao_user.user_stake_account = dao_user_stake_account.key();
     dao_user.reputation = 20;
     dao_user.total_actions = 0;
-    dao_user.stake_account_bump = ctx.bumps.dao_user_stake_account;
     dao_user.bump = ctx.bumps.dao_user;
-    dao_user.staked_amount = 0;
+    dao_user.stake_amount = 0;
     dao_user.stake_locked = false;
     dao.total_members += 1 as u64;
 

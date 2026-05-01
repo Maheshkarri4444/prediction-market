@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{Dao, EventMarket, PredictionMarketDaoErrors, PredictionMarketPlaceErrors, RESOLVE_REWARD, User, dao, market};
+use crate::{Dao, EventMarket, PredictionMarketDaoErrors, PredictionMarketPlaceErrors, RESOLVE_REWARD, User, VotingStatus, dao, market};
 
 #[derive(Accounts)]
 pub struct ResolveEvent<'info> {
@@ -87,6 +87,7 @@ pub fn resolve_event_market(ctx:Context<ResolveEvent>) -> Result<()> {
     }
 
     market.final_outcome = Some(max_option_id);
+    market.voting_status = VotingStatus::Ended;
 
     Ok(())
 }

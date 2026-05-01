@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{DaoUser, EventMarket, PredictionMarketDaoErrors, PredictionMarketPlaceErrors, Vote};
+use crate::{Dao, DaoUser, EventMarket, PredictionMarketDaoErrors, PredictionMarketPlaceErrors, Vote, VotingStatus};
 
 #[derive(Accounts)]
 pub struct VoteOnMarket<'info> {
@@ -9,18 +9,17 @@ pub struct VoteOnMarket<'info> {
 
     #[account(
         mut,
+        seeds = [b"prediction_market_dao"],
+        bump = dao.bump,
+    )]
+    pub dao: Account<'info , Dao>,
+
+    #[account(
+        mut,
         seeds = [b"dao_user" , voter.key().as_ref()],
         bump = dao_user.bump,
     )]
     pub dao_user: Account<'info, DaoUser>,
-
-    /// CHECK: Dao user stake account
-    #[account(
-        mut,
-        seeds = [b"dao_user_stake_account", voter.key().as_ref()],
-        bump = dao_user.stake_account_bump,
-    )]
-    pub dao_user_stake_account: UncheckedAccount<'info>,
 
     #[account(
         mut,
@@ -46,15 +45,19 @@ pub fn vote_on_market(ctx:Context<VoteOnMarket> , option_id: u8)->Result<()> {
     let market = &mut ctx.accounts.market;
     let vote = &mut ctx.accounts.vote;
     let dao_user = &mut ctx.accounts.dao_user;
-    let dao_user_stake_account = &mut ctx.accounts.dao_user_stake_account;
 
     let clock = Clock::get()?;
 
     require!(clock.unix_timestamp >= market.event_end_time , PredictionMarketDaoErrors::NotYetEnded);
-    require!(dao_user.user_stake_account == dao_user_stake_account.key() , PredictionMarketDaoErrors::StakeAccountMismatch);
+    require!(market.voting_status != VotingStatus::Ended , PredictionMarketDaoErrors::VotingEnded);
+
+    if market.voting_status != VotingStatus::Active {
+        market.voting_status = VotingStatus::Active;
+    }
+
     require!(option_id < market.num_options, PredictionMarketPlaceErrors::InvalidOption );
 
-    let stake = dao_user_stake_account.lamports();
+    let stake = dao_user.stake_amount;
 
     let selected_option = &mut market.options[option_id as usize];
 

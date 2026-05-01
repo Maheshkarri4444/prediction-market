@@ -127,4 +127,10 @@ pub enum PredictionMarketDaoErrors {
 
     #[msg("Stake account locked")]
     StakeAccountLocked,
+
+    #[msg("Market voting already Ended")]
+    VotingEnded,
+
+    #[msg("Dao user account locked")]
+    AccountLocked,
 }
