@@ -148,4 +148,7 @@ pub enum PredictionMarketDaoErrors {
 
     #[msg("Event not yet resolved")]
     EventNotYetResolved,
+
+    #[msg("Staked amount on vote already claimed.")]
+    AlreadyClaimed,
 }

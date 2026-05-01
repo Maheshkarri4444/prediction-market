@@ -68,6 +68,7 @@ pub fn vote_on_market(ctx:Context<VoteOnMarket> , option_id: u8 , stake: u64)->R
     vote.voter = ctx.accounts.voter.key();
     vote.stake_voted = stake;
     vote.option_id = option_id;
+    vote.stake_claimed = false;
     vote.bump = ctx.bumps.vote;
 
     dao_user.locked_amount += stake as u64;

@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{DaoUser, EventMarket, PredictionMarketPlaceErrors, Vote};
+use crate::{DaoUser, EventMarket, PredictionMarketDaoErrors, PredictionMarketPlaceErrors, Vote};
 
 #[derive(Accounts)]
 pub struct ClaimStake<'info> {
@@ -35,6 +35,11 @@ pub fn claim_stake(ctx: Context<ClaimStake>) -> Result<()> {
     let market = &mut ctx.accounts.market;
     let dao_user = &mut ctx.accounts.dao_user;
     let vote = &mut ctx.accounts.vote;
+
+    require!(
+        !vote.stake_claimed,
+        PredictionMarketDaoErrors::AlreadyClaimed
+    );
 
     let voter_stake = vote.stake_voted;
 
@@ -82,10 +87,14 @@ pub fn claim_stake(ctx: Context<ClaimStake>) -> Result<()> {
         dao_user.total_stake += total_reward as u64;
         dao_user.locked_amount -= voter_stake as u64;
         dao_user.free_amount += total_reward as u64;
+
+        vote.stake_claimed = true;
     } else {
         // false contribution
         dao_user.total_stake -= voter_stake as u64;
-        dao_user.locked_amount -= voter_stake as u64
+        dao_user.locked_amount -= voter_stake as u64;
+
+        vote.stake_claimed = true;
     }
 
     Ok(())
