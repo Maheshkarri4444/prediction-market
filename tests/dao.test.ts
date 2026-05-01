@@ -7,6 +7,7 @@ import {
 } from "@solana/web3.js";
 import { assert } from "chai";
 import fs from "fs";
+import BN from "bn.js";
 
 describe("dao-full", () => {
   const provider = anchor.AnchorProvider.env();
@@ -123,11 +124,6 @@ describe("dao-full", () => {
       program.programId
     );
 
-    const [stakePda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("dao_user_stake_account"), user.publicKey.toBuffer()],
-      program.programId
-    );
-
     const ata = await anchor.utils.token.associatedAddress({
       mint: mint.publicKey,
       owner: user.publicKey,
@@ -142,32 +138,31 @@ describe("dao-full", () => {
       metadataProgramId
     );
 
-    await program.methods
-      .createDaoUser(
-        "dao_user",
-        "DAO",
-        "https://example.com/meta.json"
-      )
-      .accounts({
-        user: user.publicKey,
-        dao: daoPda,
-        daoVault: daoVault,
-        daoUser: daoUserPda,
-        daoUserStakeAccount: stakePda,
-        daoNftMint: mint.publicKey,
-        userNftAccount: ata,
-        metadata: metadata,
-        metadataProgram: metadataProgramId,
-        tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
-        systemProgram: SystemProgram.programId,
-        associatedTokenProgram:
-          anchor.utils.token.ASSOCIATED_PROGRAM_ID,
-        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-      })
-      .signers([user, mint])
-      .rpc();
+    // await program.methods
+    //   .createDaoUser(
+    //     "dao_user",
+    //     "DAO",
+    //     "https://example.com/meta.json"
+    //   )
+    //   .accounts({
+    //     user: user.publicKey,
+    //     dao: daoPda,
+    //     daoVault: daoVault,
+    //     daoUser: daoUserPda,
+    //     daoNftMint: mint.publicKey,
+    //     userNftAccount: ata,
+    //     metadata: metadata,
+    //     metadataProgram: metadataProgramId,
+    //     tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
+    //     systemProgram: SystemProgram.programId,
+    //     associatedTokenProgram:
+    //       anchor.utils.token.ASSOCIATED_PROGRAM_ID,
+    //     rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+    //   })
+    //   .signers([user, mint])
+    //   .rpc();
 
-    return { daoUserPda, stakePda, ata, metadata };
+    return { daoUserPda, ata, metadata };
   };
 
   // -----------------------------------
@@ -184,4 +179,62 @@ describe("dao-full", () => {
 
     console.log("DAO Users created ✅");
   });
+
+    const stakeDaoUser = async (user: Keypair, daoUserPda: PublicKey) => {
+    const amount = new BN(1_000_000_000); // 1 SOL
+
+    await program.methods
+        .stake(amount)
+        .accounts({
+        user: user.publicKey,
+        daoUser: daoUserPda,
+        dao: daoPda,
+        daoStakeAccount: daoStakeAccount,
+        systemProgram: SystemProgram.programId,
+        })
+        .signers([user])
+        .rpc();
+
+    return amount;
+    };
+
+    const unstakeDaoUser = async (user: Keypair, daoUserPda: PublicKey) => {
+    const amount = new BN(500_000_000); // 0.5 SOL
+
+    await program.methods
+        .unstake(amount)
+        .accounts({
+        user: user.publicKey,
+        daoUser: daoUserPda,
+        dao: daoPda,
+        daoStakeAccount: daoStakeAccount,
+        systemProgram: SystemProgram.programId,
+        })
+        .signers([user])
+        .rpc();
+
+    return amount;
+    };
+
+    it("Stake in DAO", async () => { 
+        await stakeDaoUser(daoUser1, daoUser1Pda);
+        await stakeDaoUser(daoUser2, daoUser2Pda);
+        await stakeDaoUser(daoUser3, daoUser3Pda);
+
+        const u1 = await program.account.daoUser.fetch(daoUser1Pda);
+
+        console.log("User1 stake:", u1.totalStake.toString());
+
+        assert.ok(u1.totalStake.toNumber() > 0);
+    });
+
+    it("Unstake DAO Users", async () => {
+        await unstakeDaoUser(daoUser1, daoUser1Pda);
+
+        const u1 = await program.account.daoUser.fetch(daoUser1Pda);
+
+        console.log("User1 free amount:", u1.freeAmount.toString());
+
+        assert.ok(u1.freeAmount.toNumber() >= 0);
+    });
 });

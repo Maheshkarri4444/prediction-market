@@ -38,16 +38,6 @@ pub struct CreateDaoUser<'info> {
     )]
     pub dao_user: Account<'info, DaoUser>,
 
-    /// CHECK: Dao user stake account
-    #[account(
-        init,
-        payer = user,
-        space = 8,
-        seeds = [b"dao_user_stake_account", user.key().as_ref()],
-        bump 
-    )]
-    pub dao_user_stake_account: UncheckedAccount<'info>,
-
     #[account(
         init,
         payer = user,
@@ -87,7 +77,6 @@ pub fn create_dao_user(
     let dao = &mut ctx.accounts.dao;
     let user = &mut ctx.accounts.user;
     let dao_user = &mut ctx.accounts.dao_user;
-    let user_stake_account = &mut ctx.accounts.dao_user_stake_account;
     let user_nft_account = &mut ctx.accounts.user_nft_account;
 
     require!(
