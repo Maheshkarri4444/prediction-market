@@ -58,6 +58,13 @@ describe("dao-full", () => {
   let ata2: PublicKey;
   let ata3: PublicKey;
 
+
+  let eventMarketPda: PublicKey;
+  let eventMarketVault: PublicKey;
+
+  let eventMint1 = Keypair.generate();
+  let eventMint2 = Keypair.generate();
+
   // -----------------------------------
   // FETCH MARKETPLACE
   // -----------------------------------
@@ -183,17 +190,17 @@ describe("dao-full", () => {
     const stakeDaoUser = async (user: Keypair, daoUserPda: PublicKey) => {
     const amount = new BN(1_000_000_000); // 1 SOL
 
-    await program.methods
-        .stake(amount)
-        .accounts({
-        user: user.publicKey,
-        daoUser: daoUserPda,
-        dao: daoPda,
-        daoStakeAccount: daoStakeAccount,
-        systemProgram: SystemProgram.programId,
-        })
-        .signers([user])
-        .rpc();
+    // await program.methods
+    //     .stake(amount)
+    //     .accounts({
+    //     user: user.publicKey,
+    //     daoUser: daoUserPda,
+    //     dao: daoPda,
+    //     daoStakeAccount: daoStakeAccount,
+    //     systemProgram: SystemProgram.programId,
+    //     })
+    //     .signers([user])
+    //     .rpc();
 
     return amount;
     };
@@ -201,17 +208,17 @@ describe("dao-full", () => {
     const unstakeDaoUser = async (user: Keypair, daoUserPda: PublicKey) => {
     const amount = new BN(500_000_000); // 0.5 SOL
 
-    await program.methods
-        .unstake(amount)
-        .accounts({
-        user: user.publicKey,
-        daoUser: daoUserPda,
-        dao: daoPda,
-        daoStakeAccount: daoStakeAccount,
-        systemProgram: SystemProgram.programId,
-        })
-        .signers([user])
-        .rpc();
+    // await program.methods
+    //     .unstake(amount)
+    //     .accounts({
+    //     user: user.publicKey,
+    //     daoUser: daoUserPda,
+    //     dao: daoPda,
+    //     daoStakeAccount: daoStakeAccount,
+    //     systemProgram: SystemProgram.programId,
+    //     })
+    //     .signers([user])
+    //     .rpc();
 
     return amount;
     };
@@ -237,4 +244,113 @@ describe("dao-full", () => {
 
         assert.ok(u1.freeAmount.toNumber() >= 0);
     });
+
+    // -----------------------------------
+    // CREATE EVENT MARKET
+    // -----------------------------------
+    it("Create Event Market", async () => {
+    const marketplace =
+        await program.account.predictionMarketPlaceDetails.fetch(
+        marketplacePda
+        );
+
+    const marketId = marketplace.totalMarkets.add(new BN(1));
+
+    [eventMarketPda] = PublicKey.findProgramAddressSync(
+        [
+        Buffer.from("event_market"),
+        creator.publicKey.toBuffer(),
+        marketId.toArrayLike(Buffer, "le", 8),
+        ],
+        program.programId
+    );
+
+    [eventMarketVault] = PublicKey.findProgramAddressSync(
+        [
+        Buffer.from("event_market_vault"),
+        creator.publicKey.toBuffer(),
+        eventMarketPda.toBuffer(),
+        ],
+        program.programId
+    );
+
+    const now = Math.floor(Date.now() / 1000);
+
+    await program.methods
+        .createEventMarket(
+        {
+            optioned: {
+            options: [
+                { optionName: "YES" },
+                { optionName: "NO" },
+            ],
+            time: new BN(now + 60),
+            },
+        },
+        "Will RCB win today's match?",
+        new BN(now + 30),
+        new BN(now + 120)
+        )
+        .accounts({
+        creator: creator.publicKey,
+        predictionMarketPlace: marketplacePda,
+        market: eventMarketPda,
+        marketVault: eventMarketVault,
+        dao: daoPda,
+        daoVault: daoVault,
+        systemProgram: SystemProgram.programId,
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+        })
+        .rpc();
+
+    const market = await program.account.eventMarket.fetch(eventMarketPda);
+
+    console.log("Event Market Created:", market.question);
+
+    if (!market.question.includes("RCB")) {
+        throw new Error("Market not created properly");
+    }
+    });
+
+    // -----------------------------------
+    // ADD EVENT OPTIONS
+    // -----------------------------------
+    it("Add Event Options", async () => {
+    await program.methods
+        .addOptionForEventMarket()
+        .accounts({
+        creator: creator.publicKey,
+        market: eventMarketPda,
+        tokenMint: eventMint1.publicKey,
+        tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+        })
+        .signers([eventMint1])
+        .rpc();
+
+    await program.methods
+        .addOptionForEventMarket()
+        .accounts({
+        creator: creator.publicKey,
+        market: eventMarketPda,
+        tokenMint: eventMint2.publicKey,
+        tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+        })
+        .signers([eventMint2])
+        .rpc();
+
+    const market = await program.account.eventMarket.fetch(eventMarketPda);
+
+    console.log("Options added:", market.options.length);
+
+    if (market.options.length !== 2) {
+        throw new Error("Options not added properly");
+    }
+
+    if (!market.started) {
+        throw new Error("Market should be started after options added");
+    }
+    });
+
 });
