@@ -6,7 +6,7 @@ use anchor_spl::{
 
 use crate::{
     calculate_price, mint_tokens, EventMarket, Order, PredictionMarketDaoErrors,
-    PredictionMarketPlaceErrors, User,
+    PredictionMarketPlaceErrors, User, PRECISION,
 };
 
 #[derive(Accounts)]
@@ -79,14 +79,14 @@ pub fn create_event_order(ctx: Context<CreateEventOrder>, option: u8, quantity: 
     let market_status = market.started;
     let market_end_time = market.market_end_time;
 
-    let selected_option = &mut market.options[option as usize];
+    let mut option_data = market.options[option as usize].clone();
 
     require!(
-        selected_option.mint == option_token_mint.key(),
+        option_data.mint == option_token_mint.key(),
         PredictionMarketPlaceErrors::TokenMintMismatch
     );
 
-    let pool_lamports = selected_option.pool_amount;
+    let pool_lamports = option_data.pool_amount;
 
     let clock = Clock::get()?;
 
@@ -100,9 +100,14 @@ pub fn create_event_order(ctx: Context<CreateEventOrder>, option: u8, quantity: 
         PredictionMarketPlaceErrors::MarketClosed
     );
 
-    let selected_pool = pool_lamports + selected_option.virtual_pool_amount as u64;
+    let selected_pool = pool_lamports + option_data.virtual_pool_amount as u64;
     let computed_price = calculate_price(selected_pool, total_pool)?;
-    let required_amount = computed_price as u64 * quantity as u64;
+    let required_amount = computed_price
+        .checked_mul(quantity)
+        .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
+        .checked_div(PRECISION)
+        .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+
     let selected_to_token_account = &mut ctx.accounts.token_account;
 
     require!(
@@ -121,13 +126,16 @@ pub fn create_event_order(ctx: Context<CreateEventOrder>, option: u8, quantity: 
         required_amount,
     )?;
 
-    selected_option.pool_amount = selected_option
+    option_data.pool_amount = option_data
         .pool_amount
         .checked_add(required_amount)
         .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
 
+    // write back
+    market.options[option as usize] = option_data;
+
     let signer: &[&[u8]] = &[
-        b"market",
+        b"event_market",
         market.authority.as_ref(),
         &market.id.to_le_bytes(),
         &[market.bump],

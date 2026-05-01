@@ -17,6 +17,10 @@ describe("dao-full", () => {
 
   const creator = provider.wallet;
 
+    const rawKeys = JSON.parse(fs.readFileSync("keys.json", "utf-8"));
+  const user1 = Keypair.fromSecretKey(Uint8Array.from(rawKeys[0].secretKey));
+  const user2 = Keypair.fromSecretKey(Uint8Array.from(rawKeys[1].secretKey));
+
   // -------------------------------
   // LOAD DAO WALLETS
   // -------------------------------
@@ -352,5 +356,70 @@ describe("dao-full", () => {
         throw new Error("Market should be started after options added");
     }
     });
+
+    // -----------------------------------
+    // CREATE ORDER (NORMAL USER)
+    // -----------------------------------
+    it("Create Event Order (User1)", async () => {
+  const market = await program.account.eventMarket.fetch(eventMarketPda);
+
+  const optionMint = market.options[0].mint;
+
+  const [user1Pda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("user_v1"), user1.publicKey.toBuffer()],
+    program.programId
+  );
+
+  const userAcc = await program.account.user.fetch(user1Pda);
+
+  const orderId = userAcc.totalOrders.add(new BN(1));
+
+  const [orderPda] = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("buy_shares"),
+      eventMarketPda.toBuffer(),
+      orderId.toArrayLike(Buffer, "be", 8),
+    ],
+    program.programId
+  );
+
+  const user1OptionATA = await anchor.utils.token.associatedAddress({
+    mint: optionMint,
+    owner: user1.publicKey,
+  });
+
+  const quantity = new BN(1_000_000);
+
+  await program.methods
+    .createEventOrder(0, quantity)
+    .accounts({
+      buyer: user1.publicKey,
+      user: user1Pda,                
+      market: eventMarketPda,
+      tokenMint: optionMint,
+      order: orderPda,               
+      marketVault: eventMarketVault,
+      tokenAccount: user1OptionATA,
+      tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
+      associatedTokenProgram: anchor.utils.token.ASSOCIATED_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+      rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+    })
+    .signers([user1])
+    .rpc();
+
+  console.log("Order placed by user1 ✅");
+
+  const updatedMarket = await program.account.eventMarket.fetch(eventMarketPda);
+
+  console.log(
+    "Updated pool:",
+    updatedMarket.options[0].poolAmount.toString()
+  );
+
+  if (updatedMarket.options[0].poolAmount.toNumber() === 0) {
+    throw new Error("Order failed");
+  }
+});
 
 });

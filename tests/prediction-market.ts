@@ -216,7 +216,7 @@
 //     });
 
 //     await program.methods
-//       .createOrder(0, new anchor.BN(1))
+//       .createOrder(0, new anchor.BN(1_000_000))
 //       .accounts({
 //         buyer: user1.publicKey,
 //         user: user1Pda,
@@ -232,6 +232,19 @@
 //       })
 //       .signers([user1])
 //       .rpc();
+
+//     const updatedMarket = await program.account.market.fetch(marketPda);
+
+//     console.log("Opiton data: ", updatedMarket.options[0]);
+
+//       console.log(
+//         "Updated pool:",
+//         updatedMarket.options[0].poolAmount.toString()
+//       );
+
+//       if (updatedMarket.options[0].poolAmount.toNumber() === 0) {
+//         throw new Error("Order failed");
+//       }
 //   });
 
 //   // // -----------------------------------

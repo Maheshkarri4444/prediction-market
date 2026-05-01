@@ -1,4 +1,4 @@
-use crate::PredictionMarketPlaceErrors;
+use crate::{PredictionMarketPlaceErrors, PRECISION};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, *};
 use pyth_sdk_solana::state::SolanaPriceAccount;
@@ -10,6 +10,8 @@ pub fn calculate_price(selected_pool: u64, total_pool: u64) -> Result<u64> {
     );
 
     let price = selected_pool
+        .checked_mul(PRECISION)
+        .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
         .checked_div(total_pool)
         .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
 

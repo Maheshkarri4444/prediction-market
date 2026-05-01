@@ -82,7 +82,14 @@ pub fn claim_funds(ctx: Context<ClaimFunds>)-> Result<()> {
         let mut vault_lamports = vault_info.try_borrow_mut_lamports()?;
         let amount = **vault_lamports;
         require!(amount != 0 , PredictionMarketPlaceErrors::NoFundsInVault);
-        let out_funds = amount - resolved_amount as u64;
+        require!(
+            amount >= resolved_amount,
+            PredictionMarketPlaceErrors::NoFundsInVault
+        );
+
+        let out_funds = amount
+            .checked_sub(resolved_amount)
+            .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
 
         let mut creator_lamports = creator_info.try_borrow_mut_lamports()?;
 

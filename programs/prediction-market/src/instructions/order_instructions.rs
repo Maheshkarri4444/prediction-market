@@ -4,7 +4,7 @@ use anchor_spl::{
     token::{self, Burn, Mint, Token, TokenAccount},
 };
 
-use crate::{calculate_price, mint_tokens};
+use crate::{calculate_price, mint_tokens, PRECISION};
 use crate::{Market, Order, PredictionMarketPlaceErrors, User};
 #[derive(Accounts)]
 pub struct CreateOrder<'info> {
@@ -76,9 +76,9 @@ pub fn create_order(ctx: Context<CreateOrder>, option: u8, quantity: u64) -> Res
 
     let market_vault = &mut ctx.accounts.market_vault;
 
-    let selected = &mut market.options[option as usize];
+    let mut option_data = market.options[option as usize].clone();
 
-    let pool_lamports = selected.pool_amount;
+    let pool_lamports = option_data.pool_amount;
 
     let clock = Clock::get()?;
 
@@ -93,14 +93,18 @@ pub fn create_order(ctx: Context<CreateOrder>, option: u8, quantity: u64) -> Res
     );
 
     require!(
-        ctx.accounts.token_mint.key() == selected.mint,
+        ctx.accounts.token_mint.key() == option_data.mint,
         PredictionMarketPlaceErrors::TokenMintMismatch
     );
 
-    let selected_pool = pool_lamports + selected.virtual_pool_amount as u64;
+    let selected_pool = pool_lamports + option_data.virtual_pool_amount as u64;
 
     let computed_price = calculate_price(selected_pool, total_pool)?;
-    let required_amount = computed_price as u64 * quantity as u64;
+    let required_amount = computed_price
+        .checked_mul(quantity)
+        .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
+        .checked_div(PRECISION)
+        .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
 
     let selected_mint = &ctx.accounts.token_mint;
     let selected_to_token_account = &ctx.accounts.token_account;
@@ -123,10 +127,13 @@ pub fn create_order(ctx: Context<CreateOrder>, option: u8, quantity: u64) -> Res
         required_amount,
     )?;
 
-    selected.pool_amount = selected
+    option_data.pool_amount = option_data
         .pool_amount
         .checked_add(required_amount)
         .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+
+    // write back
+    market.options[option as usize] = option_data;
 
     let signer: &[&[u8]] = &[
         b"market",
