@@ -15,7 +15,7 @@ pub use dao_layer_instructions::*;
 pub mod dao_layer_states;
 pub use dao_layer_states::*;
 
-declare_id!("9JcjW2redyHBkahstcNDvDJWd4zmPypDeufvS3NDeFyu");
+declare_id!("BgSe3ez9gS9faWhMZRsUBhqwk3Yd3fqVVNwar4hBHAPh");
 
 #[program]
 pub mod prediction_market {
