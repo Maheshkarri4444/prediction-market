@@ -1,10 +1,13 @@
 use anchor_lang::{prelude::*, system_program::Transfer};
 use anchor_spl::{
     associated_token::AssociatedToken,
-    token::{Mint, Token, TokenAccount},
+    token::{self, Burn, Mint, Token, TokenAccount},
 };
 
-use crate::{calculate_price, mint_tokens, EventMarket, Order, PredictionMarketPlaceErrors, User};
+use crate::{
+    calculate_price, mint_tokens, EventMarket, Order, PredictionMarketDaoErrors,
+    PredictionMarketPlaceErrors, User,
+};
 
 #[derive(Accounts)]
 pub struct CreateEventOrder<'info> {
@@ -193,4 +196,108 @@ pub struct ClaimEventWinningReward<'info> {
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
+}
+
+pub fn claim_event_winning_reward(ctx: Context<ClaimEventWinningReward>) -> Result<()> {
+    let buyer = &mut ctx.accounts.buyer;
+    let user_account = &mut ctx.accounts.user;
+    let market = &mut ctx.accounts.market;
+    let token_mint = &mut ctx.accounts.token_mint;
+    let market_vault = &mut ctx.accounts.market_vault;
+    let token_account = &mut ctx.accounts.token_account;
+
+    let clock = Clock::get()?;
+
+    require!(
+        clock.unix_timestamp >= market.event_end_time,
+        PredictionMarketPlaceErrors::MarketEndtimeNotReached
+    );
+    require!(
+        market.resolved,
+        PredictionMarketDaoErrors::EventNotYetResolved
+    );
+
+    require!(
+        market.vault == market_vault.key(),
+        PredictionMarketPlaceErrors::MarketVaultMismatch
+    );
+    require!(
+        market.final_outcome.is_some(),
+        PredictionMarketPlaceErrors::NoOutcome
+    );
+
+    let total_option_tokens = token_mint.supply;
+    require!(
+        total_option_tokens > 0,
+        PredictionMarketPlaceErrors::NoTokensInMint
+    );
+
+    let mut option_index: Option<u8> = None;
+    let mut total_pool = 0;
+    for (i, option) in market.options.iter().enumerate() {
+        if option.mint == token_mint.key() {
+            option_index = Some(i as u8);
+        }
+        total_pool += option.pool_amount as u64;
+    }
+    // 5% of pool for dao reward
+    let dao_reward = total_pool
+        .checked_mul(5)
+        .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
+        .checked_div(100)
+        .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+
+    total_pool = total_pool
+        .checked_sub(dao_reward)
+        .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+    let option_index = option_index.ok_or(PredictionMarketPlaceErrors::TokenMintNotFound)?;
+
+    let market_vault_account_info = market_vault.to_account_info();
+
+    if let Some(outcome) = market.final_outcome {
+        let user_account_info = user_account.to_account_info();
+        let user_tokens = token_account.amount;
+        let user_reward = user_tokens
+            .checked_mul(total_pool)
+            .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
+            .checked_div(total_option_tokens)
+            .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+        let is_winning_option = outcome == option_index;
+        require!(
+            user_tokens != 0,
+            PredictionMarketPlaceErrors::NoTokensAvailable
+        );
+
+        // if the tokens belong to the winning option , then reward them.
+        if is_winning_option {
+            let mut user_lamports = user_account_info.try_borrow_mut_lamports()?;
+            let mut market_vault_lamports = market_vault_account_info.try_borrow_mut_lamports()?;
+            require!(
+                **market_vault_lamports >= user_reward,
+                PredictionMarketPlaceErrors::InsufficientFundsInTreasury
+            );
+
+            **market_vault_lamports = (**market_vault_lamports)
+                .checked_sub(user_reward)
+                .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+            **user_lamports = (**user_lamports)
+                .checked_add(user_reward)
+                .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+
+            user_account.total_won_amount += user_reward as u64;
+        }
+        token::burn(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Burn {
+                    mint: token_mint.to_account_info(),
+                    from: token_account.to_account_info(),
+                    authority: user_account_info,
+                },
+            ),
+            user_tokens,
+        )?;
+    }
+
+    Ok(())
 }

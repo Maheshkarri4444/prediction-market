@@ -17,6 +17,9 @@ pub enum PredictionMarketPlaceErrors {
     #[msg("Username too long")]
     UsernameTooLong,
 
+    #[msg("Event end time must be greater than market end time")]
+    InvalidEventTime,
+
     #[msg("Pool vault mismatch")]
     PoolVaultMismatch,
 
@@ -37,6 +40,9 @@ pub enum PredictionMarketPlaceErrors {
 
     #[msg("Market Endtime not yet reached")]
     MarketEndtimeNotReached,
+
+    #[msg("Event not yet ended")]
+    EventNotEnded,
 
     #[msg("Fund transfer Error")]
     FundTransferError,
@@ -139,4 +145,7 @@ pub enum PredictionMarketDaoErrors {
 
     #[msg("Insufficient free amount to vote")]
     InsufficientFreeAmountToVote,
+
+    #[msg("Event not yet resolved")]
+    EventNotYetResolved,
 }

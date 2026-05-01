@@ -30,6 +30,7 @@ pub fn create_user(ctx: Context<CreateUser>, username: String) -> Result<()> {
     user_account.username = username;
     user_account.pubkey = user.key();
     user_account.total_orders = 0;
+    user_account.total_won_amount = 0;
     user_account.bump = ctx.bumps.user_account;
 
     Ok(())

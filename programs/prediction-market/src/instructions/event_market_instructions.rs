@@ -74,6 +74,7 @@ pub fn create_event_market (
         question.len() <= MAX_STRING,
         PredictionMarketPlaceErrors::LengthTooLong
     );
+    require!(event_end_time >= market_end_time , PredictionMarketPlaceErrors::InvalidEventTime);
     require!(creator.lamports() >= CREATION_FEE , PredictionMarketPlaceErrors::InsufficientFundsForCreationFee);
 
     if let EventQuestionType::Optioned { options, .. } = &question_type {

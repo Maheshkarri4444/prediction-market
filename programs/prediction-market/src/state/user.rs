@@ -7,6 +7,7 @@ pub struct User {
     pub username: String,
     pub pubkey: Pubkey,
     pub total_orders: u64,
+    pub total_won_amount: u64,
     pub bump: u8,
 }
 

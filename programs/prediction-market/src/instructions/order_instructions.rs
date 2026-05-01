@@ -163,6 +163,13 @@ pub struct ClaimWinningReward<'info> {
 
     #[account(
         mut,
+        seeds = [b"user_v1", user.key().as_ref()],
+        bump = user_account.bump,
+    )]
+    pub user_account: Account<'info, User>,
+
+    #[account(
+        mut,
         seeds=[b"market" , market.authority.as_ref() , &market.id.to_le_bytes()],
         bump = market.bump,
     )]
@@ -197,6 +204,7 @@ pub fn claim_winning_reward(ctx: Context<ClaimWinningReward>) -> Result<()> {
     let token_account = &mut ctx.accounts.token_account;
 
     let user = &ctx.accounts.user;
+    let user_account = &mut ctx.accounts.user_account;
 
     let market_vault = &mut ctx.accounts.market_vault;
 
@@ -257,6 +265,8 @@ pub fn claim_winning_reward(ctx: Context<ClaimWinningReward>) -> Result<()> {
             **user_lamports = (**user_lamports)
                 .checked_add(user_reward)
                 .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+
+            user_account.total_won_amount += user_reward as u64;
         }
         token::burn(
             CpiContext::new(
