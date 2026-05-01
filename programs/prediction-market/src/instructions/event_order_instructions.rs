@@ -150,3 +150,47 @@ pub fn create_event_order(ctx: Context<CreateEventOrder>, option: u8, quantity: 
 
     Ok(())
 }
+
+#[derive(Accounts)]
+pub struct ClaimEventWinningReward<'info> {
+    #[account(mut)]
+    pub buyer: Signer<'info>,
+
+    #[account(
+        mut,
+        seeds = [b"user_v1", buyer.key().as_ref()],
+        bump = user.bump,
+    )]
+    pub user: Account<'info, User>,
+
+    #[account(
+        mut,
+        seeds = [b"event_market", market.authority.key().as_ref() , &market.id.to_le_bytes()],
+        bump = market.bump
+    )]
+    pub market: Account<'info, EventMarket>,
+
+    #[account(mut)]
+    pub token_mint: Box<Account<'info, Mint>>,
+
+    /// CHECK: vault for this market.
+    #[account(
+        mut,
+        seeds = [b"event_market_vault", market.authority.as_ref(), market.key().as_ref()],
+        bump = market.vault_bump,
+    )]
+    pub market_vault: UncheckedAccount<'info>,
+
+    #[account(
+        init_if_needed,
+        payer = buyer,
+        associated_token::mint = token_mint,
+        associated_token::authority = buyer,
+    )]
+    pub token_account: Box<Account<'info, TokenAccount>>,
+
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
+}
