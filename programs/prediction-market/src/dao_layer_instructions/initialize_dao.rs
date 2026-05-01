@@ -38,7 +38,7 @@ pub struct InitializeDao<'info>{
         init,
         payer = creator,
         space = 8,
-        seeds = [b"prediction_market_dao_stake_account"],
+        seeds = [b"dao_stake_account"],
         bump 
     )]
     pub dao_stake_account: UncheckedAccount<'info>,

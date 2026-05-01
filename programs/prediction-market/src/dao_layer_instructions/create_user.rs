@@ -112,25 +112,23 @@ pub fn create_dao_user(
         PredictionMarketDaoErrors::InsufficientBalance
     );
 
-    {
-        let user_info = ctx.accounts.user.to_account_info();
-        let mut user_lamports = user_info.try_borrow_mut_lamports()?;
-
-        let dao_vault_info = ctx.accounts.dao_vault.to_account_info();
-        let mut dao_vault_lamports = dao_vault_info.try_borrow_mut_lamports()?;
-
-        **user_lamports = (**user_lamports)
-            .checked_sub(DAO_USER_CREATION_FEE)
-            .ok_or(PredictionMarketPlaceErrors::FundTransferError)?;
-        **dao_vault_lamports = (**dao_vault_lamports)
-            .checked_add(DAO_USER_CREATION_FEE)
-            .ok_or(PredictionMarketPlaceErrors::FundTransferError)?;
-    }
+    anchor_lang::system_program::transfer(
+        CpiContext::new(
+            ctx.accounts.system_program.to_account_info(),
+            Transfer {
+                from: ctx.accounts.user.to_account_info(),
+                to: ctx.accounts.dao_vault.to_account_info(),
+            },
+        ),
+        DAO_USER_CREATION_FEE,
+    )?;
 
     // DAO NFT
-    let signer: &[&[u8]] = &[b"prediction_market_dao", &[dao.bump]];
+    let signer_seeds: &[&[&[u8]]] = &[&[
+        b"prediction_market_dao",
+        &[dao.bump],
+    ]];
 
-    let signer_seeds = &[signer];
     token::mint_to(
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
@@ -173,7 +171,7 @@ pub fn create_dao_user(
         },
     );
 
-    anchor_lang::solana_program::program::invoke(
+    anchor_lang::solana_program::program::invoke_signed(
         &ix,
         &[
             ctx.accounts.metadata_program.to_account_info(),
@@ -184,6 +182,10 @@ pub fn create_dao_user(
             ctx.accounts.system_program.to_account_info(),
             ctx.accounts.rent.to_account_info(),
         ],
+        &[&[
+            b"prediction_market_dao",
+            &[dao.bump],
+        ]],
     )?;
 
     dao_user.username = username;
@@ -222,7 +224,7 @@ pub struct DaoUserStake<'info> {
     /// CHECK: Dao user stake account
     #[account(
         mut,
-        seeds = [b"prediction_market_dao_stake_account"],
+        seeds = [b"dao_stake_account"],
         bump = dao.stake_account_bump,
     )]
     pub dao_stake_account: UncheckedAccount<'info>,
@@ -276,7 +278,7 @@ pub struct DaoUserUnstake<'info> {
     /// CHECK: Dao user stake account
     #[account(
         mut,
-        seeds = [b"prediction_market_dao_stake_account"],
+        seeds = [b"dao_stake_account"],
         bump = dao.stake_account_bump,
     )]
     pub dao_stake_account: UncheckedAccount<'info>,

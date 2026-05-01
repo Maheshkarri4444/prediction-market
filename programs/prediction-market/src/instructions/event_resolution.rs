@@ -39,7 +39,7 @@ pub struct ResolveEvent<'info> {
     /// CHECK: Dao stake account
     #[account(
         mut,
-        seeds = [b"prediction_market_dao_stake_account"],
+        seeds = [b"dao_stake_account"],
         bump = dao.stake_account_bump,
     )]
     pub dao_stake_account: UncheckedAccount<'info>,
