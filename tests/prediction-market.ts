@@ -166,115 +166,142 @@ describe("prediction-market-full", () => {
   // -----------------------------------
   // ADD OPTIONS
   // -----------------------------------
-  // it("Add Options", async () => {
-  //   optionMint1 = Keypair.generate();
-  //   optionMint2 = Keypair.generate();
+  it("Add Options", async () => {
+    optionMint1 = Keypair.generate();
+    optionMint2 = Keypair.generate();
 
-  //   await program.methods
-  //     .addOptionDetails()
-  //     .accounts({
-  //       creator: creator.publicKey,
-  //       market: marketPda,
-  //       tokenMint: optionMint1.publicKey,
-  //       tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
-  //       systemProgram: SystemProgram.programId,
-  //     })
-  //     .signers([optionMint1])
-  //     .rpc();
+    await program.methods
+      .addOptionDetails()
+      .accounts({
+        creator: creator.publicKey,
+        market: marketPda,
+        tokenMint: optionMint1.publicKey,
+        tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([optionMint1])
+      .rpc();
 
-  //   await program.methods
-  //     .addOptionDetails()
-  //     .accounts({
-  //       creator: creator.publicKey,
-  //       market: marketPda,
-  //       tokenMint: optionMint2.publicKey,
-  //       tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
-  //       systemProgram: SystemProgram.programId,
-  //     })
-  //     .signers([optionMint2])
-  //     .rpc();
-  // });
+    await program.methods
+      .addOptionDetails()
+      .accounts({
+        creator: creator.publicKey,
+        market: marketPda,
+        tokenMint: optionMint2.publicKey,
+        tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([optionMint2])
+      .rpc();
+  });
 
   // // -----------------------------------
   // // CREATE ORDER
   // // -----------------------------------
-  // it("Create Order", async () => {
-  //   const orderId = new anchor.BN(1);
+  it("Create Order", async () => {
+    const orderId = new anchor.BN(1);
 
-  //   [orderPda] = PublicKey.findProgramAddressSync(
-  //     [
-  //       Buffer.from("buy_shares"),
-  //       marketPda.toBuffer(),
-  //       orderId.toArrayLike(Buffer, "be", 8),
-  //     ],
-  //     program.programId
-  //   );
+    [orderPda] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("buy_shares"),
+        marketPda.toBuffer(),
+        orderId.toArrayLike(Buffer, "be", 8),
+      ],
+      program.programId
+    );
 
-  //   tokenAccount = await anchor.utils.token.associatedAddress({
-  //     mint: optionMint1.publicKey,
-  //     owner: user1.publicKey,
-  //   });
+    tokenAccount = await anchor.utils.token.associatedAddress({
+      mint: optionMint1.publicKey,
+      owner: user1.publicKey,
+    });
 
-  //   await program.methods
-  //     .createOrder(0, new anchor.BN(1))
-  //     .accounts({
-  //       buyer: user1.publicKey,
-  //       user: user1Pda,
-  //       market: marketPda,
-  //       tokenMint: optionMint1.publicKey,
-  //       order: orderPda,
-  //       marketVault: marketVault,
-  //       tokenAccount: tokenAccount,
-  //       tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
-  //       associatedTokenProgram:
-  //         anchor.utils.token.ASSOCIATED_PROGRAM_ID,
-  //       systemProgram: SystemProgram.programId,
-  //     })
-  //     .signers([user1])
-  //     .rpc();
-  // });
+    await program.methods
+      .createOrder(0, new anchor.BN(1))
+      .accounts({
+        buyer: user1.publicKey,
+        user: user1Pda,
+        market: marketPda,
+        tokenMint: optionMint1.publicKey,
+        order: orderPda,
+        marketVault: marketVault,
+        tokenAccount: tokenAccount,
+        tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
+        associatedTokenProgram:
+          anchor.utils.token.ASSOCIATED_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([user1])
+      .rpc();
+  });
 
   // // -----------------------------------
   // // WAIT + RESOLVE MARKET
   // // -----------------------------------
-  // it("Resolve Market", async () => {
-  //   console.log("Waiting for market end...");
-  //   await new Promise((r) => setTimeout(r, 35000));
+  it("Resolve Market", async () => {
+    console.log("Waiting for market end...");
+    await new Promise((r) => setTimeout(r, 65000));
 
-  //   await program.methods
-  //     .resolveMarket()
-  //     .accounts({
-  //       resolver: creator.publicKey,
-  //       market: marketPda,
-  //       priceFeed: PYTH_ETH_FEED,
-  //       predictionMarketplace: marketplacePda,
-  //       predictionMarketplaceVault: marketplaceVault,
-  //     })
-  //     .rpc();
+    await program.methods
+      .resolveMarket()
+      .accounts({
+        resolver: creator.publicKey,
+        market: marketPda,
+        priceFeed: PYTH_ETH_FEED,
+        predictionMarketplace: marketplacePda,
+        predictionMarketplaceVault: marketplaceVault,
+      })
+      .rpc();
 
-  //   const market = await program.account.market.fetch(marketPda);
-  //   assert.ok(market.resolved === true);
-  // });
+    const market = await program.account.market.fetch(marketPda);
+    assert.ok(market.resolved === true);
+  });
 
   // // -----------------------------------
   // // CLAIM REWARD
   // // -----------------------------------
-  // it("Claim Reward", async () => {
-  //   await program.methods
-  //     .claimWinningReward()
-  //     .accounts({
-  //       user: user1.publicKey,
-  //       userAccount: user1Pda,
-  //       market: marketPda,
-  //       marketVault: marketVault,
-  //       tokenMint: optionMint1.publicKey,
-  //       tokenAccount: tokenAccount,
-  //       systemProgram: SystemProgram.programId,
-  //       tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
-  //       associatedTokenProgram:
-  //         anchor.utils.token.ASSOCIATED_PROGRAM_ID,
-  //     })
-  //     .signers([user1])
-  //     .rpc();
-  // });
+  it("Claim Reward", async () => {
+    await program.methods
+      .claimWinningReward()
+      .accounts({
+        user: user1.publicKey,
+        userAccount: user1Pda,
+        market: marketPda,
+        marketVault: marketVault,
+        tokenMint: optionMint1.publicKey,
+        tokenAccount: tokenAccount,
+        systemProgram: SystemProgram.programId,
+        tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
+        associatedTokenProgram:
+          anchor.utils.token.ASSOCIATED_PROGRAM_ID,
+      })
+      .signers([user1])
+      .rpc();
+  });
+
+  // claim funds 
+  it("Claim Funds", async () => {
+    const beforeBalance = await provider.connection.getBalance(
+      creator.publicKey
+    );
+
+    await program.methods
+      .claimFunds()
+      .accounts({
+        creator: creator.publicKey,
+        predictionMarketPlace: marketplacePda,
+        predictionMarketPlaceVault: marketplaceVault,
+      })
+      .rpc();
+
+    const afterBalance = await provider.connection.getBalance(
+      creator.publicKey
+    );
+
+    console.log("Before:", beforeBalance);
+    console.log("After :", afterBalance);
+
+    // just basic sanity check
+    assert.ok(afterBalance >= beforeBalance);
+  });
+
 });
