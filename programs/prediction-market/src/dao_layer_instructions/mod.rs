@@ -6,3 +6,6 @@ pub use create_user::*;
 
 pub mod vote_on_market;
 pub use vote_on_market::*;
+
+pub mod claim_stake;
+pub use claim_stake::*;

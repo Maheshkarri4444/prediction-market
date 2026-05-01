@@ -65,7 +65,6 @@ pub fn create_event_market (
     let market = &mut ctx.accounts.market;
     let market_vault = &mut ctx.accounts.market_vault;
 
-    let dao = &mut ctx.accounts.dao;
     let dao_vault = &mut ctx.accounts.dao_vault;
 
     let num_options: u8;

@@ -147,7 +147,6 @@ pub struct EventMarket {
     pub final_outcome: Option<u8>,
 
     pub vault: Pubkey,
-
     pub vault_bump: u8,
     pub bump: u8,
 }

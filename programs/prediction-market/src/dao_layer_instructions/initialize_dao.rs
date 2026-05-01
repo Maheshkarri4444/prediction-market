@@ -221,7 +221,7 @@ pub fn add_founder (ctx: Context<AddFounder>, username: String , symbol: String 
     dao_user.total_actions = 0;
     dao_user.bump = ctx.bumps.dao_user;
     dao_user.total_stake = 0;
-    dao_user.free_amount = 0;
+    dao_user.locked_amount = 0;
     dao_user.free_amount = 0;
     dao.total_members += 1 as u64;
 

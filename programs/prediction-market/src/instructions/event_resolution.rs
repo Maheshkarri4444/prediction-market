@@ -49,10 +49,18 @@ pub struct ResolveEvent<'info> {
 pub fn resolve_event_market(ctx:Context<ResolveEvent>) -> Result<()> {
     let resolver = &mut ctx.accounts.resolver;
     let market = &mut ctx.accounts.market;
+    let market_vault = &mut ctx.accounts.market_vault;
     let dao = &mut ctx.accounts.dao;
     let dao_vault = &mut ctx.accounts.dao_vault;
 
     let clock = Clock::get()?;
+
+    let mut total_pool: u64 = 0;
+
+    for (i, option) in market.options.iter().enumerate() {
+        total_pool += option.pool_amount as u64;
+    }
+
 
     require!(clock.unix_timestamp > market.event_end_time, PredictionMarketDaoErrors::EventDidNotEnd);
     let mut max_option_id = 0;
@@ -67,16 +75,16 @@ pub fn resolve_event_market(ctx:Context<ResolveEvent>) -> Result<()> {
         }
     }
 
-    let computed_quarum = dao.dao_total_stake.checked_div(2).ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+    let computed_quarum = dao.dao_total_stake.checked_div(10).ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
     require!(total_stake_voted >= computed_quarum , PredictionMarketDaoErrors::QuarumNotReached);
 
-    let winning_stake = total_stake_voted.checked_mul(2).ok_or(PredictionMarketPlaceErrors::MathOverflow)?.checked_div(3).ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+    let winning_stake = total_stake_voted.checked_div(2).ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
     require!(max_stake >= winning_stake , PredictionMarketDaoErrors::WinnerNotReachedWinningAmount);
 
     require!(dao_vault.lamports() >= RESOLVE_REWARD ,PredictionMarketPlaceErrors::InsufficientFundsInTreasury);
-
-    {
         let dao_vault_info = dao_vault.to_account_info();
+    {
+
         let mut dao_vault_lamports = dao_vault_info.try_borrow_mut_lamports()?;
 
         let resolver_info = resolver.to_account_info();
@@ -84,6 +92,18 @@ pub fn resolve_event_market(ctx:Context<ResolveEvent>) -> Result<()> {
 
         **dao_vault_lamports = (**dao_vault_lamports).checked_sub(RESOLVE_REWARD).ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
         **resolver_lamports = (**resolver_lamports).checked_add(RESOLVE_REWARD).ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+    }
+
+    // 5% from total pool , moved to dao vault to reward the dao truth voters
+    let computed_transfer = total_pool.checked_mul(5).ok_or(PredictionMarketPlaceErrors::MathOverflow)?.checked_div(100).ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+    let market_vault_info = market_vault.to_account_info();
+    {
+        let mut dao_vault_lamports = dao_vault_info.try_borrow_mut_lamports()?;
+
+        let mut market_vault_lamports = market_vault_info.try_borrow_mut_lamports()?;
+
+        **dao_vault_lamports = (**dao_vault_lamports).checked_sub(computed_transfer).ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+        **market_vault_lamports = (**market_vault_lamports).checked_add(computed_transfer).ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
     }
 
     market.final_outcome = Some(max_option_id);
