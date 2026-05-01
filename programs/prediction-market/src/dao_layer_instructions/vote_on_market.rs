@@ -62,7 +62,6 @@ pub fn vote_on_market(ctx:Context<VoteOnMarket> , option_id: u8 , stake: u64)->R
 
     selected_option.stake_voted += stake as u64;
 
-    dao_user.total_actions += 1 as u64;  
     dao_user.total_votes += 1 as u64;
 
     vote.market = market.key();

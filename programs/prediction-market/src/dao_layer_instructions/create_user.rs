@@ -190,7 +190,6 @@ pub fn create_user(
     dao_user.pubkey = ctx.accounts.user.key();
     dao_user.nft_mint = ctx.accounts.dao_nft_mint.key();
     dao_user.reputation = 10;
-    dao_user.total_actions = 0;
     dao_user.bump = ctx.bumps.dao_user;
     dao_user.total_stake = 0;
     dao_user.free_amount = 0;

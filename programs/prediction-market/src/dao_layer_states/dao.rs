@@ -6,7 +6,7 @@ pub struct Dao {
     pub vault: Pubkey, // it contains treasury
     pub total_events: u64,
     pub total_members: u64,
-    pub dao_status: bool, // live when all the founders are added.
+    pub dao_status: bool, // live after initialized.
     pub dao_stake_account: Pubkey,
     pub dao_total_stake: u64, // it contains all the stake users staked.
     pub stake_account_bump: u8,

@@ -64,7 +64,7 @@ pub fn create_event_market (
     let prediction_market_place = &mut ctx.accounts.prediction_market_place;
     let market = &mut ctx.accounts.market;
     let market_vault = &mut ctx.accounts.market_vault;
-
+    let dao = &mut ctx.accounts.dao;
     let dao_vault = &mut ctx.accounts.dao_vault;
 
     let num_options: u8;
@@ -118,6 +118,7 @@ pub fn create_event_market (
     market.bump = ctx.bumps.market;
 
 
+    dao.total_events += 1 as u64;
     prediction_market_place.total_markets += 1 as u64;
     Ok(())
 }

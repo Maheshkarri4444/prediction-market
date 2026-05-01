@@ -1,9 +1,7 @@
 use anchor_lang::prelude::*;
-use anchor_spl::{associated_token::AssociatedToken, token::{self, Mint, MintTo, Token, TokenAccount}};
+use anchor_spl::{ token::{ Token}};
 
-use crate::{Dao, DaoUser, MAX_USER, PredictionMarketDaoErrors, PredictionMarketPlaceDetails, PredictionMarketPlaceErrors};
-use mpl_token_metadata::{MAX_URI_LENGTH, instructions::CreateMetadataAccountV3};
-use mpl_token_metadata::types::DataV2;
+use crate::{Dao, PredictionMarketDaoErrors, PredictionMarketPlaceDetails};
 #[derive(Accounts)]
 pub struct InitializeDao<'info>{
     #[account(mut)]
@@ -63,167 +61,12 @@ pub fn initialize_dao(ctx: Context<InitializeDao>)->Result<()>{
     dao.vault = dao_vault.key();
     dao.total_members = 0;
     dao.total_events = 0;
+    dao.dao_status = true;
     dao.dao_total_stake = 0;
     dao.dao_stake_account = dao_stake_account.key();
     dao.stake_account_bump = ctx.bumps.dao_stake_account;
     dao.vault_bump = ctx.bumps.dao_vault;
     dao.bump = ctx.bumps.dao;
-
-    Ok(())
-}
-
-#[derive(Accounts)]
-pub struct AddFounder<'info> {
-    #[account(mut)]
-    pub creator: Signer<'info>,
-
-    pub founder: SystemAccount<'info>,
-
-    #[account(
-        init,
-        payer = creator,
-        space = DaoUser::LEN,
-        seeds = [b"dao_user" , founder.key().as_ref()],
-        bump
-    )]
-    pub dao_user: Account<'info , DaoUser>,
-
-    /// CHECK: Dao user stake account
-    #[account(
-        init,
-        payer = creator,
-        space = 8,
-        seeds = [b"dao_user_stake_account",founder.key().as_ref()],
-        bump 
-    )]
-    pub dao_user_stake_account: UncheckedAccount<'info>,
-
-    #[account(
-        mut,
-        seeds = [b"prediction_market_dao"],
-        bump = dao.bump,
-    )]
-    pub dao: Account<'info , Dao>,
-
-    #[account(
-        init,
-        payer = creator,
-        mint::authority = dao,
-        mint::decimals = 0,
-    )]
-    pub dao_nft_mint: Account<'info,Mint>,
-
-
-    #[account(
-        init,
-        payer = creator,
-        associated_token::mint = dao_nft_mint,
-        associated_token::authority = founder,
-    )]
-    pub founder_nft_account: Account<'info , TokenAccount>,
-
-    /// CHECK: metadata
-    #[account(mut)]
-    pub metadata: UncheckedAccount<'info>,
-
-    /// CHECK: Metaplex metadata program
-    #[account(address = mpl_token_metadata::ID)]
-    pub metadata_program: UncheckedAccount<'info>,
-
-    pub associated_token_program: Program<'info,AssociatedToken>,
-    pub token_program: Program<'info,Token>,
-    pub system_program: Program<'info, System>,
-    pub rent: Sysvar<'info , Rent>,
-}
-
-pub fn add_founder (ctx: Context<AddFounder>, username: String , symbol: String , uri: String) -> Result<()> {
-    let founder = &mut ctx.accounts.founder;
-    let dao_user = &mut ctx.accounts.dao_user;
-    let dao_user_stake_account = &mut ctx.accounts.dao_user_stake_account;
-    let founder_nft_account = &mut ctx.accounts.founder_nft_account;
-    let dao = &mut ctx.accounts.dao;
-
-
-    require!(ctx.accounts.dao_nft_mint.supply == 0 , PredictionMarketDaoErrors::NftAlreadyMinted);
-
-    require!(username.len() <= MAX_USER, PredictionMarketPlaceErrors::UsernameTooLong);
-    require!(symbol.len() <= MAX_USER , PredictionMarketDaoErrors::SymbolTooLong);
-    require!(uri.len() <= MAX_URI_LENGTH,PredictionMarketDaoErrors::UriTooLong);
-
-
-    // DAO NFT 
-    let signer: &[&[u8]] = &[
-        b"prediction_market_dao",
-        &[dao.bump],
-    ];
-
-    let signer_seeds = &[signer];
-    token::mint_to(
-        CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(), 
-            MintTo { 
-                mint: ctx.accounts.dao_nft_mint.to_account_info(), 
-                to: founder_nft_account.to_account_info(), 
-                authority: dao.to_account_info(), 
-            },
-            signer_seeds,
-        ), 
-        1
-    )?;
-
-
-    // metaplex metadata 
-    let name = username.clone();
-    let data = DataV2 {
-        name,
-        symbol,
-        uri,
-        seller_fee_basis_points: 0,
-        creators: None,
-        collection: None,
-        uses: None,
-    };
-
-    let ix = CreateMetadataAccountV3 {
-        metadata: ctx.accounts.metadata.key(),
-        mint: ctx.accounts.dao_nft_mint.key(),
-        mint_authority: dao.key(),
-        payer: ctx.accounts.creator.key(),
-        update_authority: (dao.key(), true),
-        system_program: ctx.accounts.system_program.key(),
-        rent: Some(ctx.accounts.rent.key()),
-    }
-    .instruction(
-        mpl_token_metadata::instructions::CreateMetadataAccountV3InstructionArgs {
-            data,
-            is_mutable: true,
-            collection_details: None,
-        },
-    );
-
-    anchor_lang::solana_program::program::invoke(
-        &ix,
-        &[
-            ctx.accounts.metadata_program.to_account_info(),
-            ctx.accounts.metadata.to_account_info(),
-            ctx.accounts.dao_nft_mint.to_account_info(),
-            dao.to_account_info(),
-            ctx.accounts.creator.to_account_info(),
-            ctx.accounts.system_program.to_account_info(),
-            ctx.accounts.rent.to_account_info(),
-        ],
-    )?;
-
-    dao_user.username = username; 
-    dao_user.pubkey = founder.key();
-    dao_user.nft_mint = ctx.accounts.dao_nft_mint.key();
-    dao_user.reputation = 20;
-    dao_user.total_actions = 0;
-    dao_user.bump = ctx.bumps.dao_user;
-    dao_user.total_stake = 0;
-    dao_user.locked_amount = 0;
-    dao_user.free_amount = 0;
-    dao.total_members += 1 as u64;
 
     Ok(())
 }
