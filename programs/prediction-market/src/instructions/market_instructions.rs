@@ -1,4 +1,4 @@
-use crate::{get_normalized_price, User, Vault};
+use crate::{get_normalized_price, User};
 use crate::{
     market::Market, OptionDetails, PredictionMarketPlaceDetails, PredictionMarketPlaceErrors,
     QuestionType, CREATION_FEE, MAX_OUTCOMES, MAX_STRING, RESOLVE_REWARD,
@@ -54,7 +54,7 @@ pub struct CreateMarket<'info> {
         seeds = [b"market_vault", creator.key().as_ref(), market.key().as_ref()],
         bump,
     )]
-    pub market_vault: Account<'info, Vault>,
+    pub market_vault: UncheckedAccount<'info>,
 
     /// CHECK: Price feed from pyth
     pub price_feed: UncheckedAccount<'info>,

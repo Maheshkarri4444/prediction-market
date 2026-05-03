@@ -9,7 +9,7 @@ use anchor_spl::{
 
 use crate::{
     calculate_price, mint_tokens, EventMarket, Order, PredictionMarketDaoErrors,
-    PredictionMarketPlaceErrors, User, Vault, PRECISION,
+    PredictionMarketPlaceErrors, User, PRECISION,
 };
 
 #[derive(Accounts)]
@@ -49,7 +49,7 @@ pub struct CreateEventOrder<'info> {
         seeds = [b"event_market_vault", market.authority.as_ref(), market.key().as_ref()],
         bump = market.vault_bump,
     )]
-    pub market_vault: Account<'info, Vault>,
+    pub market_vault: UncheckedAccount<'info>,
 
     #[account(
         init_if_needed,
@@ -200,7 +200,7 @@ pub struct ClaimEventWinningReward<'info> {
         seeds = [b"event_market_vault", market.authority.as_ref(), market.key().as_ref()],
         bump = market.vault_bump,
     )]
-    pub market_vault: Account<'info, Vault>,
+    pub market_vault: UncheckedAccount<'info>,
 
     #[account(
         init_if_needed,

@@ -1,1 +1,86 @@
 @import "tailwindcss";
+
+@theme {
+  --font-display: "Bebas Neue", cursive;
+  --font-body: "DM Sans", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  --color-void: #050508;
+  --color-surface: #0d0d14;
+  --color-panel: #12121c;
+  --color-border: #1e1e2e;
+  --color-accent: #00ff88;
+  --color-accent-dim: #00cc6a;
+  --color-gold: #ffd166;
+  --color-gold-dim: #cc9c33;
+  --color-crimson: #ff3860;
+  --color-sky: #00c2ff;
+  --color-muted: #4a4a6a;
+  --color-dim: #2a2a3e;
+
+  --shadow-glow: 0 0 20px rgba(0,255,136,0.25);
+  --shadow-glow-sm: 0 0 10px rgba(0,255,136,0.15);
+  --shadow-glow-gold: 0 0 20px rgba(255,209,102,0.25);
+  --shadow-panel: 0 4px 24px rgba(0,0,0,0.4);
+
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4,0,0.6,1) infinite;
+  --animate-shimmer: shimmer 2s linear infinite;
+  --animate-fade-up: fadeUp 0.5s ease forwards;
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  @keyframes fadeUp {
+    0% { opacity: 0; transform: translateY(16px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+}
+
+@layer base {
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background-color: #050508;
+    color: #e0e0f0;
+    font-family: "DM Sans", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #0d0d14; }
+  ::-webkit-scrollbar-thumb { background: #1e1e2e; border-radius: 3px; }
+}
+
+@layer components {
+  .grid-bg {
+    background-image:
+      linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+  .glow-line {
+    background: linear-gradient(90deg, transparent, #00ff88, transparent);
+    height: 1px;
+  }
+  .card-panel {
+    @apply bg-panel border border-border rounded-2xl;
+  }
+  .shimmer-text {
+    background: linear-gradient(90deg, #00ff88 0%, #00c2ff 40%, #00ff88 80%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 3s linear infinite;
+  }
+  .wallet-adapter-button {
+    background: transparent !important;
+    border: 1px solid #1e1e2e !important;
+    font-family: "DM Sans", sans-serif !important;
+  }
+  .wallet-adapter-modal-wrapper {
+    background: #0d0d14 !important;
+    border: 1px solid #1e1e2e !important;
+  }
+}

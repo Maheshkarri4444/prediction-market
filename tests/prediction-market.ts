@@ -114,14 +114,14 @@
 //     //   .signers([user2])
 //     //   .rpc();
 
-//     await program.methods
-//       .createUser("creator")
-//       .accounts({
-//         user: creator.publicKey,
-//         userAccount: creatorPda,
-//         systemProgram: SystemProgram.programId,
-//       })
-//       .rpc();
+//     // await program.methods
+//     //   .createUser("creator")
+//     //   .accounts({
+//     //     user: creator.publicKey,
+//     //     userAccount: creatorPda,
+//     //     systemProgram: SystemProgram.programId,
+//     //   })
+//     //   .rpc();
 //   });
 
 //   it("Fetch Price Feed", async () => {

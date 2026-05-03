@@ -174,6 +174,3 @@ impl EventOptionDetails {
         }
     }
 }
-
-#[account]
-pub struct Vault {}

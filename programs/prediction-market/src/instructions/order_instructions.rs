@@ -7,7 +7,7 @@ use anchor_spl::{
     token::{self, Burn, Mint, Token, TokenAccount},
 };
 
-use crate::{calculate_price, mint_tokens, Vault, PRECISION};
+use crate::{calculate_price, mint_tokens, PRECISION};
 use crate::{Market, Order, PredictionMarketPlaceErrors, User};
 #[derive(Accounts)]
 pub struct CreateOrder<'info> {
@@ -46,7 +46,7 @@ pub struct CreateOrder<'info> {
         seeds = [b"market_vault", market.authority.as_ref(), market.key().as_ref()],
         bump = market.vault_bump,
     )]
-    pub market_vault: Account<'info, Vault>,
+    pub market_vault: UncheckedAccount<'info>,
 
     #[account(
         init_if_needed,

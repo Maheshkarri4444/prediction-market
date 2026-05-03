@@ -10,9 +10,17 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "@solana/wallet-adapter-base": "^0.9.23",
+    "@solana/wallet-adapter-phantom": "^0.9.24",
+    "@solana/wallet-adapter-react": "^0.15.35",
+    "@solana/wallet-adapter-react-ui": "^0.9.35",
+    "@solana/web3.js": "^1.95.3",
     "@tailwindcss/vite": "^4.2.4",
+    "bn.js": "^5.2.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "react-router-dom": "^6.27.0",
     "tailwindcss": "^4.2.4"
   },
   "devDependencies": {
@@ -20,10 +28,13 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "autoprefixer": "^10.4.20",
+    "buffer": "^6.0.3",
     "eslint": "^10.2.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.5.0",
+    "postcss": "^8.4.47",
     "vite": "^8.0.10"
   }
 }
