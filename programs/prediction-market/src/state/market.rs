@@ -104,12 +104,9 @@ impl Market {
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
 pub enum EventQuestionType {
-    Binary {
-        time: i64,
-    },
+    Binary,
     Optioned {
         options: Vec<EventOption>, // Maximum 5 options can be added
-        time: i64,
     },
 }
 
@@ -177,3 +174,6 @@ impl EventOptionDetails {
         }
     }
 }
+
+#[account]
+pub struct Vault {}

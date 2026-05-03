@@ -21,3 +21,6 @@
 // fs.writeFileSync("keys.json", JSON.stringify(wallets, null, 2));
 
 // console.log("\n✅ Keys saved to keys.json");
+
+// User1 wallet: 6Auk1fSAoiyL9UpiXLET6QEPwz9pTSbJG66QF87kJTRv
+// User2 wallet: CFKzmSkAsaS3Z3c9PRn43cZphQPFqeDn5prPeVTqLPST

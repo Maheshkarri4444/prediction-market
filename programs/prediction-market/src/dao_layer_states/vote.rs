@@ -11,5 +11,5 @@ pub struct Vote {
 }
 
 impl Vote {
-    pub const LEN: usize = 74;
+    pub const LEN: usize = 75;
 }

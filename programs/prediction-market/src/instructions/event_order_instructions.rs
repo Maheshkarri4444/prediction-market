@@ -1,12 +1,15 @@
 use anchor_lang::{prelude::*, system_program::Transfer};
 use anchor_spl::{
-    associated_token::AssociatedToken,
+    associated_token::{
+        spl_associated_token_account::solana_program::native_token::LAMPORTS_PER_SOL,
+        AssociatedToken,
+    },
     token::{self, Burn, Mint, Token, TokenAccount},
 };
 
 use crate::{
     calculate_price, mint_tokens, EventMarket, Order, PredictionMarketDaoErrors,
-    PredictionMarketPlaceErrors, User, PRECISION,
+    PredictionMarketPlaceErrors, User, Vault, PRECISION,
 };
 
 #[derive(Accounts)]
@@ -35,7 +38,7 @@ pub struct CreateEventOrder<'info> {
         init,
         payer = buyer,
         space = 8 + Order::LEN,
-        seeds = [b"buy_shares", market.key().as_ref(), &(user.total_orders + 1).to_be_bytes()],
+        seeds = [b"buy_shares", buyer.key().as_ref(), market.key().as_ref(), &(user.total_orders + 1).to_be_bytes()],
         bump
     )]
     pub order: Account<'info, Order>,
@@ -46,7 +49,7 @@ pub struct CreateEventOrder<'info> {
         seeds = [b"event_market_vault", market.authority.as_ref(), market.key().as_ref()],
         bump = market.vault_bump,
     )]
-    pub market_vault: UncheckedAccount<'info>,
+    pub market_vault: Account<'info, Vault>,
 
     #[account(
         init_if_needed,
@@ -64,6 +67,7 @@ pub struct CreateEventOrder<'info> {
 
 pub fn create_event_order(ctx: Context<CreateEventOrder>, option: u8, quantity: u64) -> Result<()> {
     let buyer = &mut ctx.accounts.buyer;
+    let user = &mut ctx.accounts.user;
     let market = &mut ctx.accounts.market;
     let mut total_pool: u64 = 0;
     for (_, option) in market.options.iter().enumerate() {
@@ -104,6 +108,10 @@ pub fn create_event_order(ctx: Context<CreateEventOrder>, option: u8, quantity: 
     let computed_price = calculate_price(selected_pool, total_pool)?;
     let required_amount = computed_price
         .checked_mul(quantity)
+        .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
+        .checked_div(PRECISION)
+        .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
+        .checked_mul(LAMPORTS_PER_SOL)
         .ok_or(PredictionMarketPlaceErrors::MathOverflow)?
         .checked_div(PRECISION)
         .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
@@ -159,6 +167,8 @@ pub fn create_event_order(ctx: Context<CreateEventOrder>, option: u8, quantity: 
     order.token_account = ctx.accounts.token_account.key();
     order.time_stamp = clock.unix_timestamp as i64;
 
+    user.total_orders += 1 as u64;
+
     Ok(())
 }
 
@@ -190,7 +200,7 @@ pub struct ClaimEventWinningReward<'info> {
         seeds = [b"event_market_vault", market.authority.as_ref(), market.key().as_ref()],
         bump = market.vault_bump,
     )]
-    pub market_vault: UncheckedAccount<'info>,
+    pub market_vault: Account<'info, Vault>,
 
     #[account(
         init_if_needed,
@@ -260,10 +270,8 @@ pub fn claim_event_winning_reward(ctx: Context<ClaimEventWinningReward>) -> Resu
         .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
     let option_index = option_index.ok_or(PredictionMarketPlaceErrors::TokenMintNotFound)?;
 
-    let market_vault_account_info = market_vault.to_account_info();
-
     if let Some(outcome) = market.final_outcome {
-        let user_account_info = user_account.to_account_info();
+        let buyer_info = buyer.to_account_info();
         let user_tokens = token_account.amount;
         let user_reward = user_tokens
             .checked_mul(total_pool)
@@ -275,36 +283,42 @@ pub fn claim_event_winning_reward(ctx: Context<ClaimEventWinningReward>) -> Resu
             user_tokens != 0,
             PredictionMarketPlaceErrors::NoTokensAvailable
         );
-
-        // if the tokens belong to the winning option , then reward them.
-        if is_winning_option {
-            let mut user_lamports = user_account_info.try_borrow_mut_lamports()?;
-            let mut market_vault_lamports = market_vault_account_info.try_borrow_mut_lamports()?;
-            require!(
-                **market_vault_lamports >= user_reward,
-                PredictionMarketPlaceErrors::InsufficientFundsInTreasury
-            );
-
-            **market_vault_lamports = (**market_vault_lamports)
-                .checked_sub(user_reward)
-                .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
-            **user_lamports = (**user_lamports)
-                .checked_add(user_reward)
-                .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
-
-            user_account.total_won_amount += user_reward as u64;
-        }
+        let market_vault_account_info = market_vault.to_account_info();
         token::burn(
             CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
                 Burn {
                     mint: token_mint.to_account_info(),
                     from: token_account.to_account_info(),
-                    authority: user_account_info,
+                    authority: buyer_info.clone(),
                 },
             ),
             user_tokens,
         )?;
+        // if the tokens belong to the winning option , then reward them.
+        if is_winning_option {
+            require!(
+                market_vault_account_info.lamports() >= user_reward,
+                PredictionMarketPlaceErrors::InsufficientFundsInTreasury
+            );
+            msg!("vault lamports: {}", market_vault_account_info.lamports());
+            msg!("user_reward: {}", user_reward);
+            msg!("total_pool: {}", total_pool);
+            msg!("user_tokens: {}", user_tokens);
+            msg!("total_option_tokens: {}", total_option_tokens);
+            let mut vault_lamports = market_vault_account_info.try_borrow_mut_lamports()?;
+            let mut buyer_lamports = buyer_info.try_borrow_mut_lamports()?;
+
+            **vault_lamports = vault_lamports
+                .checked_sub(user_reward)
+                .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+
+            **buyer_lamports = buyer_lamports
+                .checked_add(user_reward)
+                .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+
+            user_account.total_won_amount += user_reward as u64;
+        }
     }
 
     Ok(())

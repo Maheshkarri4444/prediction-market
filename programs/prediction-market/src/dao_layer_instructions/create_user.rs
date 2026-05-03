@@ -5,7 +5,7 @@ use anchor_spl::{
 };
 use mpl_token_metadata::{instructions::CreateMetadataAccountV3, types::DataV2, MAX_URI_LENGTH};
 
-use crate::{PredictionMarketPlaceErrors, dao_user};
+use crate::{PredictionMarketPlaceErrors, dao, dao_user};
 use crate::{Dao, DaoUser, DAO_USER_CREATION_FEE};
 use crate::{PredictionMarketDaoErrors, MAX_USER};
 
@@ -223,6 +223,7 @@ pub struct DaoUserStake<'info> {
 
 pub fn dao_user_stake(ctx: Context<DaoUserStake>, amount: u64)-> Result<()> {
     let user = &mut ctx.accounts.user;
+    let dao = &mut ctx.accounts.dao;
     let dao_user = &mut ctx.accounts.dao_user;
     let dao_stake_account = &mut ctx.accounts.dao_stake_account;
 
@@ -241,6 +242,8 @@ pub fn dao_user_stake(ctx: Context<DaoUserStake>, amount: u64)-> Result<()> {
 
     dao_user.total_stake += amount as u64;
     dao_user.free_amount += amount as u64;
+
+    dao.dao_total_stake += amount as u64;
 
     Ok(())
 }
@@ -278,6 +281,7 @@ pub struct DaoUserUnstake<'info> {
 
 pub fn dao_user_unstake(ctx:Context<DaoUserUnstake> ,  amount: u64) -> Result<()> {
     let user = &mut ctx.accounts.user;
+    let dao = &mut ctx.accounts.dao;
     let dao_user = &mut ctx.accounts.dao_user;
     let dao_stake_account = &mut ctx.accounts.dao_stake_account;
 
@@ -300,6 +304,8 @@ pub fn dao_user_unstake(ctx:Context<DaoUserUnstake> ,  amount: u64) -> Result<()
 
     dao_user.total_stake -= amount as u64;
     dao_user.free_amount -= amount as u64;
+
+    dao.dao_total_stake -= amount as u64;
 
     Ok(())
 }

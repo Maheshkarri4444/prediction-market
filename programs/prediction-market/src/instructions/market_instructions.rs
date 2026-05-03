@@ -1,8 +1,9 @@
-use crate::get_normalized_price;
+use crate::{get_normalized_price, Vault};
 use crate::{
     market::Market, OptionDetails, PredictionMarketPlaceDetails, PredictionMarketPlaceErrors,
     QuestionType, CREATION_FEE, MAX_OUTCOMES, MAX_STRING, RESOLVE_REWARD,
 };
+use anchor_lang::system_program::transfer;
 use anchor_lang::{prelude::*, system_program::Transfer};
 use anchor_spl::{
     associated_token::spl_associated_token_account::solana_program::native_token::LAMPORTS_PER_SOL,
@@ -46,7 +47,7 @@ pub struct CreateMarket<'info> {
         seeds = [b"market_vault", creator.key().as_ref(), market.key().as_ref()],
         bump,
     )]
-    pub market_vault: UncheckedAccount<'info>,
+    pub market_vault: Account<'info, Vault>,
 
     /// CHECK: Price feed from pyth
     pub price_feed: UncheckedAccount<'info>,
@@ -246,6 +247,8 @@ pub struct ResolveMarket<'info> {
         bump = prediction_marketplace.vault_bump ,
     )]
     pub prediction_marketplace_vault: UncheckedAccount<'info>,
+
+    pub system_program: Program<'info, System>,
 }
 
 pub fn resolve_market(ctx: Context<ResolveMarket>) -> Result<()> {
@@ -425,24 +428,33 @@ pub fn resolve_market(ctx: Context<ResolveMarket>) -> Result<()> {
             }
         }
     };
-
-    market.final_outcome = Some(outcome);
-    market.resolved = true;
+    msg!("Outcome: {}", outcome);
 
     {
+        let prediction_market_key = prediction_market.key();
+        let signer_seeds: &[&[&[u8]]] = &[&[
+            b"predictionmarketplace_vault",
+            prediction_market_key.as_ref(),
+            &[prediction_market.vault_bump],
+        ]];
         let prediction_vault_info = prediction_market_vault.to_account_info();
         let resolver_info = ctx.accounts.resolver.to_account_info();
 
-        let mut prediction_vault_lamports = prediction_vault_info.try_borrow_mut_lamports()?;
-        let mut resolver_lamports = resolver_info.try_borrow_mut_lamports()?;
-
-        **prediction_vault_lamports = (**prediction_vault_lamports)
-            .checked_sub(RESOLVE_REWARD)
-            .ok_or(PredictionMarketPlaceErrors::FundTransferError)?;
-        **resolver_lamports = (**resolver_lamports)
-            .checked_add(RESOLVE_REWARD)
-            .ok_or(PredictionMarketPlaceErrors::FundTransferError)?;
+        transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.system_program.to_account_info(),
+                Transfer {
+                    from: prediction_vault_info,
+                    to: resolver_info,
+                },
+                signer_seeds,
+            ),
+            RESOLVE_REWARD,
+        )?;
     }
+
+    market.final_outcome = Some(outcome);
+    market.resolved = true;
 
     prediction_market.total_resolved += 1 as u64;
 

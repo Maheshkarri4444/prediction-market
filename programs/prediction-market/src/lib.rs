@@ -15,7 +15,7 @@ pub use dao_layer_instructions::*;
 pub mod dao_layer_states;
 pub use dao_layer_states::*;
 
-declare_id!("BgSe3ez9gS9faWhMZRsUBhqwk3Yd3fqVVNwar4hBHAPh");
+declare_id!("HMYsLuDhjARNTLb5eTbZS6aiJSfHgZ1tDwkJTMF2tKs3");
 
 #[program]
 pub mod prediction_market {
@@ -123,11 +123,11 @@ pub mod prediction_market {
         dao_layer_instructions::dao_user_unstake(ctx, amount)
     }
 
-    pub fn vote(ctx: Context<VoteOnMarket>, option: u8, amount: u64) -> Result<()> {
+    pub fn vote_on_market(ctx: Context<VoteOnMarket>, option: u8, amount: u64) -> Result<()> {
         dao_layer_instructions::vote_on_market(ctx, option, amount)
     }
 
-    pub fn claim_vote_reward(ctx: Context<ClaimStake>) -> Result<()> {
+    pub fn claim_stake(ctx: Context<ClaimStake>) -> Result<()> {
         dao_layer_instructions::claim_stake(ctx)
     }
 }

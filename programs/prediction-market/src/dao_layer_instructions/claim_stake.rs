@@ -83,7 +83,7 @@ pub fn claim_stake(ctx: Context<ClaimStake>) -> Result<()> {
             .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
 
         // transfer computations.
-        let total_reward = contribution_reward + vote_reward as u64;
+        let total_reward = contribution_reward + vote_reward as u64 + voter_stake as u64;
         dao_user.total_stake += total_reward as u64;
         dao_user.locked_amount -= voter_stake as u64;
         dao_user.free_amount += total_reward as u64;

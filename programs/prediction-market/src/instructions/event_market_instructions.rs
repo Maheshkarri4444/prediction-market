@@ -1,7 +1,7 @@
 use anchor_lang::{prelude::*, system_program::Transfer};
 use anchor_spl::{associated_token::spl_associated_token_account::solana_program::native_token::LAMPORTS_PER_SOL, token::{Mint, Token}};
 
-use crate::{CREATION_FEE, Dao, EventMarket, EventOptionDetails, EventQuestionType, MAX_OUTCOMES, MAX_STRING, PredictionMarketPlaceDetails, PredictionMarketPlaceErrors, VotingStatus};
+use crate::{CREATION_FEE, Dao, EventMarket, EventOptionDetails, EventQuestionType, MAX_OUTCOMES, MAX_STRING, PredictionMarketPlaceDetails, PredictionMarketPlaceErrors, Vault, VotingStatus};
 
 #[derive(Accounts)]
 pub struct CreateEventMarket<'info> {
@@ -32,7 +32,7 @@ pub struct CreateEventMarket<'info> {
         seeds = [b"event_market_vault", creator.key().as_ref(), market.key().as_ref()],
         bump,
     )]
-    pub market_vault: UncheckedAccount<'info>,
+    pub market_vault: Account<'info,Vault>,
 
     #[account(
         mut,  

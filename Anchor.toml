@@ -6,10 +6,10 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-prediction_market = "3nvkQT6k9kcsRuUHoXhUg46p27as9SyJVq4Q6A6ATSkC"
+prediction_market = "HMYsLuDhjARNTLb5eTbZS6aiJSfHgZ1tDwkJTMF2tKs3"
 
 [programs.devnet]
-prediction_market = "BgSe3ez9gS9faWhMZRsUBhqwk3Yd3fqVVNwar4hBHAPh"
+prediction_market = "HMYsLuDhjARNTLb5eTbZS6aiJSfHgZ1tDwkJTMF2tKs3"
 
 [registry]
 url = "https://api.apr.dev"
