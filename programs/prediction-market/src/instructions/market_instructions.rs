@@ -1,4 +1,4 @@
-use crate::{get_normalized_price, Vault};
+use crate::{get_normalized_price, User, Vault};
 use crate::{
     market::Market, OptionDetails, PredictionMarketPlaceDetails, PredictionMarketPlaceErrors,
     QuestionType, CREATION_FEE, MAX_OUTCOMES, MAX_STRING, RESOLVE_REWARD,
@@ -14,6 +14,13 @@ use pyth_sdk_solana::state::SolanaPriceAccount;
 pub struct CreateMarket<'info> {
     #[account(mut)]
     pub creator: Signer<'info>,
+
+    #[account(
+        mut,
+        seeds = [b"user_v1", creator.key().as_ref()],  
+        bump = user.bump,
+    )]
+    pub user: Box<Account<'info, User>>,
 
     #[account(
         mut,

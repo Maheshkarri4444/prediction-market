@@ -1,12 +1,20 @@
 use anchor_lang::{prelude::*, system_program::Transfer};
 use anchor_spl::{associated_token::spl_associated_token_account::solana_program::native_token::LAMPORTS_PER_SOL, token::{Mint, Token}};
 
-use crate::{CREATION_FEE, Dao, EventMarket, EventOptionDetails, EventQuestionType, MAX_OUTCOMES, MAX_STRING, PredictionMarketPlaceDetails, PredictionMarketPlaceErrors, Vault, VotingStatus};
+use crate::{CREATION_FEE, Dao, EventMarket, EventOptionDetails, EventQuestionType, MAX_OUTCOMES, MAX_STRING, PredictionMarketPlaceDetails, PredictionMarketPlaceErrors, User, Vault, VotingStatus};
 
 #[derive(Accounts)]
 pub struct CreateEventMarket<'info> {
     #[account(mut)]
     pub creator: Signer<'info>,
+
+
+    #[account(
+        mut,
+        seeds = [b"user_v1", creator.key().as_ref()],  
+        bump = user.bump,
+    )]
+    pub user: Account<'info, User>,
 
     #[account(
         mut,
