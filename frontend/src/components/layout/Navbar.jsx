@@ -20,7 +20,7 @@ export default function Navbar() {
             </svg>
           </div>
           <span className="font-display text-2xl tracking-widest text-white">
-            ORACLE<span className="text-accent">X</span>
+            PREDICT<span className="text-accent">X</span>
           </span>
         </Link>
 

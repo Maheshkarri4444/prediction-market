@@ -182,7 +182,7 @@ export default function RegisterDaoUser() {
         image: imageUri,
         attributes: [
           { trait_type: "Role", value: "DAO Member" },
-          { trait_type: "Platform", value: "OracleX" },
+          { trait_type: "Platform", value: "PREDICT-X" },
         ],
         properties: {
           files: [{ uri: imageUri, type: imageFile.type }],

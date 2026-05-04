@@ -6,10 +6,10 @@ import Spinner from "../ui/Spinner";
 
 function StatBox({ label, value, sub, accent = false }) {
   return (
-    <div className="p-5 rounded-2xl bg-panel border border-border flex flex-col gap-1">
-      <p className="text-xs font-mono text-muted uppercase tracking-widest">{label}</p>
+    <div className="p-5  rounded-2xl bg-panel border border-border flex flex-col gap-1">
+      <p className="text-xs font-mono text-white/80 uppercase tracking-widest">{label}</p>
       <p className={`font-display text-3xl tracking-wide ${accent ? "text-accent" : "text-white"}`}>{value}</p>
-      {sub && <p className="text-xs text-muted">{sub}</p>}
+      {sub && <p className="text-xs text-white/80">{sub}</p>}
     </div>
   );
 }
@@ -51,35 +51,35 @@ export default function MarketplaceStats() {
           <>
             <StatBox label="Total Markets" value={marketplace.totalMarkets?.toString() ?? "—"} sub="price + event markets" accent />
             <StatBox label="Marketplace Creator" value={shortenAddress(marketplace.creator?.toBase58())} sub="contract admin" />
-            <StatBox label="Platform Fee" value={`${marketplace.feePercent ?? "—"}%`} sub="taken on winnings" />
+            <StatBox label="Platform Fee" value={`${marketplace.feePercent ?? "0.1"} SOL`} sub="Earn more rewards" />
           </>
         ) : (
-          <div className="col-span-3 flex items-center gap-3 p-5 rounded-2xl bg-panel border border-border text-muted text-sm">
+          <div className="col-span-3 flex items-center gap-3 p-5 rounded-2xl bg-panel border border-border text-white/80 text-sm">
             <Spinner size="sm" /> Could not load marketplace data. Check your program ID and IDL.
           </div>
         )}
         {dao ? (
           <StatBox label="DAO Total Stake" value={`${formatSOL(dao.daoTotalStake?.toNumber())} SOL`} sub={`${dao.totalMembers?.toString() ?? "?"} DAO members`} accent />
         ) : (
-          <div className="p-5 rounded-2xl bg-panel border border-border text-muted text-sm flex items-center gap-2">
+          <div className="p-5 rounded-2xl bg-panel border border-border text-white/80 text-sm flex items-center gap-2">
             <Spinner size="sm" /> DAO not loaded
           </div>
         )}
       </div>
       {dao && (
         <div className="mt-4 p-5 rounded-2xl bg-panel border border-border">
-          <p className="text-xs font-mono text-muted uppercase tracking-widest mb-3">DAO Details</p>
+          <p className="text-xs font-mono text-white/80 uppercase tracking-widest mb-3">DAO Details</p>
           <div className="flex flex-wrap gap-6 text-sm">
             <div>
-              <p className="text-muted text-xs mb-0.5">Creator</p>
+              <p className="text-white/80 text-xs mb-0.5">Creator</p>
               <p className="font-mono text-white">{shortenAddress(dao.creator?.toBase58(), 6)}</p>
             </div>
             <div>
-              <p className="text-muted text-xs mb-0.5">Total Stake</p>
+              <p className="text-white/80 text-xs mb-0.5">Total Stake</p>
               <p className="font-mono text-accent">{formatSOL(dao.daoTotalStake?.toNumber())} SOL</p>
             </div>
             <div>
-              <p className="text-muted text-xs mb-0.5">Members</p>
+              <p className="text-white/80 text-xs mb-0.5">Members</p>
               <p className="font-mono text-white">{dao.totalMembers?.toString() ?? "—"}</p>
             </div>
           </div>

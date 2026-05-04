@@ -23,7 +23,6 @@ export default function Home() {
     <div className="relative min-h-screen grid-bg">
       <HeroSection />
       <MarketplaceStats />
-      <MarketsFeed />
 
       <section className="max-w-3xl mx-auto px-6 pb-24 text-center">
         <div className="p-10 rounded-3xl bg-panel border border-border relative overflow-hidden">
@@ -31,21 +30,21 @@ export default function Home() {
           {connected && status === "checking" ? (
             <div className="flex flex-col items-center gap-4 relative z-10">
               <Spinner size="lg" />
-              <p className="text-white/70 text-sm">Checking your account…</p>
+              <p className="text-white/80 text-sm">Checking your account…</p>
             </div>
           ) : connected ? null : (
             <div className="relative z-10">
-              <h2 className="font-display text-4xl tracking-widest text-white mb-3">
+              <h2 className="font-display text-4xl tracking-widest text-white/80 mb-3">
                 JOIN THE <span className="text-accent">MARKET</span>
               </h2>
-              <p className="text-white/60 text-sm mb-8 max-w-md mx-auto">
+              <p className="text-white/80 text-sm mb-8 max-w-md mx-auto">
                 Connect your Phantom wallet to participate in prediction markets, stake on outcomes, and earn rewards.
               </p>
               <WalletMultiButton style={{
                 background: "#00ff88",
                 border: "none",
                 borderRadius: "12px",
-                color: "#000000",
+                color: "#FFFFFFCC",
                 fontFamily: "'DM Sans', sans-serif",
                 fontSize: "15px",
                 fontWeight: 700,
@@ -53,7 +52,7 @@ export default function Home() {
                 height: "auto",
                 boxShadow: "0 0 20px rgba(0,255,136,0.3)",
               }} />
-              <p className="text-xs text-white/40 mt-4">Only Phantom wallet supported • Devnet only</p>
+              <p className="text-xs text-white/80 mt-4">Only Phantom wallet supported • Devnet only</p>
             </div>
           )}
         </div>

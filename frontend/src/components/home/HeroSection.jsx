@@ -16,8 +16,8 @@ export default function HeroSection() {
           <span className="text-white">EARN. GOVERN.</span>
         </h1>
 
-        <p className="text-lg text-muted max-w-2xl mx-auto leading-relaxed mb-10">
-          OracleX is a decentralized prediction marketplace on Solana. Bet on token price movements
+        <p className="text-lg text-white/80 max-w-2xl mx-auto leading-relaxed mb-10">
+          PredictX is a decentralized prediction marketplace on Solana. Bet on token price movements
           using live Pyth oracle data, or predict real-world events resolved transparently by our DAO.
         </p>
 
@@ -30,7 +30,7 @@ export default function HeroSection() {
             </div>
             <div>
               <p className="font-semibold text-white text-sm mb-1">Price Markets</p>
-              <p className="text-xs text-muted">Trade positions on ETH, BTC, SOL prices using real-time Pyth oracle feeds.</p>
+              <p className="text-xs text-white/80">Trade positions on ETH, BTC, SOL prices using real-time Pyth oracle feeds.</p>
             </div>
           </div>
           <div className="flex items-start gap-3 text-left max-w-xs p-4 rounded-xl bg-panel border border-border">
@@ -44,7 +44,7 @@ export default function HeroSection() {
             </div>
             <div>
               <p className="font-semibold text-white text-sm mb-1">Event Markets</p>
-              <p className="text-xs text-muted">Predict real-world outcomes resolved by our on-chain DAO governance system.</p>
+              <p className="text-xs text-white/80">Predict real-world outcomes resolved by our on-chain DAO governance system.</p>
             </div>
           </div>
         </div>
