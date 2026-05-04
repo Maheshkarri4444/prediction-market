@@ -130,6 +130,7 @@ export function useDaoData() {
   const [myVotes, setMyVotes] = useState({}); // marketPubkey -> vote account
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [myVotesArray, setMyVotesArray] = useState([]);
 
   const load = useCallback(async () => {
     if (!program) return;
@@ -166,24 +167,34 @@ export function useDaoData() {
           setNftMetadata(meta);
 
           // ── Fetch votes this user has cast ───────────────────────────────
-          const votesMap = {};
-          for (const m of markets) {
-            try {
-              const [votePda] = getVotePda(
-                publicKey,
-                m.publicKey,
-                program.programId
-              );
-              const voteAcc = await program.account.vote.fetch(votePda);
-              votesMap[m.publicKey.toBase58()] = {
-                ...voteAcc,
-                publicKey: votePda,
-              };
-            } catch (_) {
-              // no vote cast for this market
-            }
-          }
-          setMyVotes(votesMap);
+        const votesMap = {};
+        const votesArray = [];
+
+        for (const m of markets) {
+        try {
+            const [votePda] = getVotePda(
+            publicKey,
+            m.publicKey,
+            program.programId
+            );
+
+            const voteAcc = await program.account.vote.fetch(votePda);
+
+            const voteData = {
+            ...voteAcc,
+            publicKey: votePda,
+            market: m.publicKey, // 🔥 useful reference
+            };
+
+            votesMap[m.publicKey.toBase58()] = voteData;
+            votesArray.push(voteData);
+        } catch (_) {
+            // no vote
+        }
+        }
+
+        setMyVotes(votesMap);
+        setMyVotesArray(votesArray);
         } catch (_) {
           // user is not a DAO member
           setDaoUser(null);
@@ -196,10 +207,10 @@ export function useDaoData() {
       setLoading(false);
     }
   }, [program, publicKey]);
-
+  console.log("my votes: ", myVotes);
   useEffect(() => {
     load();
   }, [load]);
 
-  return { dao, daoUser, nftMetadata, eventMarkets, myVotes, loading, error, refresh: load };
+  return { dao, daoUser, nftMetadata, eventMarkets, myVotes,myVotesArray, loading, error, refresh: load };
 }

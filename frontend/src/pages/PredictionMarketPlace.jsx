@@ -46,38 +46,25 @@ const getFeedInfo = (pkOrStr) => {
 };
 
 // ── Option label logic ─────────────────────────────────────────────────────────
-/**
- * Returns the display label for an option given the market's question type.
- *
- * Rules:
- *  - rangeOfPrice  → "$lower – $upper"
- *  - optioned      → option.optionName
- *  - everything else (binary price/event) → index 0 = "No", index 1 = "Yes"
- */
 function getOptionLabel(index, marketAccount, isEvent) {
   const qt = marketAccount.questionType ?? marketAccount.question_type;
 
   if (!isEvent) {
-    // Price market
     if (qt && "rangeOfPrice" in qt) {
       const priceOptions = qt.rangeOfPrice.options ?? [];
       const po = priceOptions[index];
       if (po) return `$${po.lowerBound ?? po.lower_bound} – $${po.upperBound ?? po.upper_bound}`;
     }
-    // All other price types → No / Yes
     return index === 0 ? "No" : "Yes";
   } else {
-    // Event market
     const eqt = marketAccount.questionType ?? marketAccount.question_type;
     if (eqt && "optioned" in eqt) {
       const eventOption = marketAccount.options?.[index];
       const name = eventOption?.optionName ?? eventOption?.option_name;
       if (name) return name;
-      // fallback to the questionType options array
       const qtOptions = eqt.optioned.options ?? [];
       return qtOptions[index]?.optionName ?? qtOptions[index]?.option_name ?? `Option ${index + 1}`;
     }
-    // Binary event → No / Yes
     return index === 0 ? "No" : "Yes";
   }
 }
@@ -127,6 +114,7 @@ const getEventMarketResolveStatus = (acc, daoTotalStake) => {
     const now = Date.now();
     const eventEnded = now > acc.eventEndTime.toNumber() * 1000;
     if (!eventEnded) return "time_pending";
+
     const totalVoted = (acc.options ?? []).reduce(
       (s, o) => s + (o.stakeVoted?.toNumber?.() ?? 0), 0
     );
@@ -137,7 +125,35 @@ const getEventMarketResolveStatus = (acc, daoTotalStake) => {
   } catch { return "time_pending"; }
 };
 
-// Real-time betting closed check (uses a live clock tick)
+// ── Hook: fetch DAO total stake ────────────────────────────────────────────────
+function useDaoTotalStake() {
+  const program = useProgram();
+  const [daoTotalStake, setDaoTotalStake] = useState(null);
+
+  useEffect(() => {
+    if (!program) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [daoPda] = PublicKey.findProgramAddressSync(
+          [Buffer.from("prediction_market_dao")],
+          program.programId
+        );
+        const daoAcc = await program.account.dao.fetch(daoPda);
+        if (!cancelled && daoAcc?.daoTotalStake) {
+          setDaoTotalStake(daoAcc.daoTotalStake);
+        }
+      } catch (e) {
+        // DAO may not be initialized — silently ignore
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [program]);
+
+  return daoTotalStake;
+}
+
+// Real-time betting closed check
 function useBettingClosed(marketEndTimeBN) {
   const [closed, setClosed] = useState(() => {
     try { return Date.now() > marketEndTimeBN.toNumber() * 1000; } catch { return false; }
@@ -394,7 +410,7 @@ function MarketCard({
   const acc = market.account;
   const isResolved = acc.resolved || optimisticResolved;
   const options = acc.options ?? [];
-  const bettingClosed = useBettingClosed(acc.marketEndTime); // real-time
+  const bettingClosed = useBettingClosed(acc.marketEndTime);
 
   const isCreator =
     publicKey && acc.authority && acc.authority.toBase58() === publicKey.toBase58();
@@ -407,7 +423,6 @@ function MarketCard({
   const canResolve = !isResolved && (isEvent ? false : canResolvePriceMarket(acc));
   const eventResolveStatus = isEvent ? getEventMarketResolveStatus(acc, daoTotalStake) : null;
 
-  // Show add option only to the market creator and only if not yet started
   const needsMoreOptions =
     isCreator && options.length < (acc.numOptions ?? 0) && !acc.started;
 
@@ -445,7 +460,6 @@ function MarketCard({
             : "border-border bg-panel hover:border-accent/20"
         }`}
       >
-        {/* top accent bar */}
         <div className="h-0.5 w-full" style={{
           background: isResolved
             ? "rgba(255,255,255,0.05)"
@@ -455,7 +469,6 @@ function MarketCard({
         }} />
 
         <div className="p-5">
-          {/* header row */}
           <div className="flex items-start justify-between gap-3 mb-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -479,7 +492,6 @@ function MarketCard({
             </button>
           </div>
 
-          {/* meta */}
           <div className="flex items-center gap-4 text-[10px] font-mono text-white/30 mb-3 flex-wrap">
             {!isEvent && <span>{qTypeLabel(acc.questionType)}</span>}
             <span>
@@ -491,7 +503,6 @@ function MarketCard({
             <span>By: {shortKey(acc.authority)}</span>
           </div>
 
-          {/* options */}
           {options.length > 0 && (
             <div className="space-y-2">
               {options.map((opt, i) => (
@@ -503,7 +514,6 @@ function MarketCard({
                   isWinner={winnerIdx === i}
                   label={getOptionLabel(i, acc, isEvent)}
                   myOptionIndices={myOptionIndices}
-                  // buy disabled when: resolved, not started, betting closed
                   onBuy={!isResolved && acc.started && !bettingClosed ? () => setBuyOption(i) : null}
                 />
               ))}
@@ -516,7 +526,6 @@ function MarketCard({
             </p>
           )}
 
-          {/* Add option buttons — only for creator, only when setup needed */}
           {needsMoreOptions && (
             <div className="mt-3 p-3 rounded-xl border border-gold/20 bg-gold/5">
               <p className="text-[10px] font-mono text-gold/60 mb-2 uppercase tracking-widest">
@@ -536,7 +545,6 @@ function MarketCard({
             </div>
           )}
 
-          {/* Resolve buttons */}
           <div className="flex items-center gap-2 mt-3 flex-wrap">
             {canResolve && (
               <button
@@ -564,7 +572,6 @@ function MarketCard({
           </div>
         </div>
 
-        {/* expanded: all orders */}
         {expanded && (
           <div className="border-t border-border/40 px-5 py-4">
             <p className="text-[10px] font-mono text-white/30 uppercase tracking-widest mb-3">
@@ -648,7 +655,6 @@ function ClaimTab({ priceMarkets, eventMarkets, myOrders, onRefreshSingle }) {
     connection
   );
 
-  // Load on mount and whenever markets/orders change
   useEffect(() => {
     if (publicKey) reload();
   }, [publicKey, priceMarkets.length, eventMarkets.length, myOrders.length]);
@@ -656,7 +662,6 @@ function ClaimTab({ priceMarkets, eventMarkets, myOrders, onRefreshSingle }) {
   const handleClaimSuccess = useCallback(
     (marketPubkey) => {
       onRefreshSingle(marketPubkey);
-      // Also reload positions after a short delay to reflect burned tokens
       setTimeout(() => reload(), 2000);
     },
     [onRefreshSingle, reload]
@@ -734,13 +739,6 @@ function ClaimCard({ position, onSuccess }) {
   const { claimEventReward, loading: el, error: ee } = useClaimEventReward(handleSuccess);
 
   const isResolved = acc.resolved;
-  const winnerIdx =
-    isResolved && acc.finalOutcome != null
-      ? typeof acc.finalOutcome === "object"
-        ? Object.values(acc.finalOutcome)[0]
-        : acc.finalOutcome
-      : null;
-
   const statusColor =
     isWinner === true ? "border-accent/30 bg-accent/5" :
     isWinner === false ? "border-red-500/20 bg-red-500/5" :
@@ -832,18 +830,14 @@ function CreatePriceMarketModal({ onClose, onCreated }) {
     { lower: "", upper: "" },
     { lower: "", upper: "" },
   ]);
-
-  // After market creation, we stay open so the creator can add options
   const [createdMarket, setCreatedMarket] = useState(null);
 
   const { createMarket, loading, error } = useCreatePriceMarket((result) => {
-    // result should contain the new market pubkey/account
     setCreatedMarket(result);
     onCreated(result);
   });
 
   const { addOption, loading: aol, error: aoErr } = useAddOptionDetails(() => {
-    // re-fetch the created market to update options count
     onCreated(createdMarket);
   });
 
@@ -902,7 +896,6 @@ function CreatePriceMarketModal({ onClose, onCreated }) {
   const isSingleRange = qType === "rangeAtTime";
   const needsTarget = !isPercent && !isRange && !isSingleRange;
 
-  // How many options have been added so far
   const [optionsAdded, setOptionsAdded] = useState(0);
   const handleAddOption = async () => {
     if (!createdMarket) return;
@@ -923,7 +916,6 @@ function CreatePriceMarketModal({ onClose, onCreated }) {
           <button onClick={onClose} className="text-white/30 hover:text-white text-xl">✕</button>
         </div>
 
-        {/* ── Step 1: Create market ── */}
         {!createdMarket && (
           <div className="space-y-4">
             <Input label="Question" value={question} onChange={setQuestion}
@@ -1000,7 +992,6 @@ function CreatePriceMarketModal({ onClose, onCreated }) {
           </div>
         )}
 
-        {/* ── Step 2: Add options ── */}
         {createdMarket && (
           <div className="space-y-4">
             <div className="p-4 rounded-xl border border-accent/20 bg-accent/5">
@@ -1021,11 +1012,7 @@ function CreatePriceMarketModal({ onClose, onCreated }) {
                   <div
                     key={i}
                     className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                      added
-                        ? "border-accent/30 bg-accent/5"
-                        : isNext
-                        ? "border-white/20 bg-white/5"
-                        : "border-border/30 bg-dim/30 opacity-40"
+                      added ? "border-accent/30 bg-accent/5" : isNext ? "border-white/20 bg-white/5" : "border-border/30 bg-dim/30 opacity-40"
                     }`}
                   >
                     <div>
@@ -1059,9 +1046,7 @@ function CreatePriceMarketModal({ onClose, onCreated }) {
             <button
               onClick={onClose}
               className={`w-full py-3 rounded-xl font-mono font-bold text-sm uppercase tracking-widest transition-all ${
-                allOptionsAdded
-                  ? "bg-accent text-black hover:bg-accent/90"
-                  : "bg-white/5 text-white/40 border border-border hover:bg-white/10"
+                allOptionsAdded ? "bg-accent text-black hover:bg-accent/90" : "bg-white/5 text-white/40 border border-border hover:bg-white/10"
               }`}
             >
               {allOptionsAdded ? "Done" : "Close (finish later)"}
@@ -1125,7 +1110,6 @@ function CreateEventMarketModal({ onClose, onCreated }) {
           <button onClick={onClose} className="text-white/30 hover:text-white text-xl">✕</button>
         </div>
 
-        {/* ── Step 1: Create event market ── */}
         {!createdMarket && (
           <div className="space-y-4">
             <Input label="Question" value={question} onChange={setQuestion}
@@ -1191,7 +1175,6 @@ function CreateEventMarketModal({ onClose, onCreated }) {
           </div>
         )}
 
-        {/* ── Step 2: Add options ── */}
         {createdMarket && (
           <div className="space-y-4">
             <div className="p-4 rounded-xl border border-gold/20 bg-gold/5">
@@ -1209,11 +1192,7 @@ function CreateEventMarketModal({ onClose, onCreated }) {
                   <div
                     key={i}
                     className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                      added
-                        ? "border-gold/30 bg-gold/5"
-                        : isNext
-                        ? "border-white/20 bg-white/5"
-                        : "border-border/30 bg-dim/30 opacity-40"
+                      added ? "border-gold/30 bg-gold/5" : isNext ? "border-white/20 bg-white/5" : "border-border/30 bg-dim/30 opacity-40"
                     }`}
                   >
                     <div>
@@ -1247,9 +1226,7 @@ function CreateEventMarketModal({ onClose, onCreated }) {
             <button
               onClick={onClose}
               className={`w-full py-3 rounded-xl font-mono font-bold text-sm uppercase tracking-widest transition-all ${
-                allOptionsAdded
-                  ? "bg-gold text-black hover:bg-gold/90"
-                  : "bg-white/5 text-white/40 border border-border hover:bg-white/10"
+                allOptionsAdded ? "bg-gold text-black hover:bg-gold/90" : "bg-white/5 text-white/40 border border-border hover:bg-white/10"
               }`}
             >
               {allOptionsAdded ? "Done" : "Close (finish later)"}
@@ -1353,7 +1330,6 @@ function ProfileTab({ userAccount, priceMarkets, eventMarkets, myOrders, onRefre
           eventMarkets={eventMarkets}
           myOrders={myOrders}
           onRefreshSingle={(pk) => {
-            // figure out if it's a price or event market
             const isEv = eventMarkets.some((m) => m.publicKey.toBase58() === pk.toBase58());
             onRefreshSingle(pk, isEv);
           }}
@@ -1409,14 +1385,15 @@ export default function PredictionMarketPlace() {
   } = useMarkets();
   const { myOrders } = useMyOrders();
 
+  // ── Fetch DAO total stake for quorum checks ──────────────────────────────
+  const daoTotalStake = useDaoTotalStake();
+
   const [mainTab, setMainTab] = useState("markets");
   const [marketCat, setMarketCat] = useState("all");
   const [statusFilter, setStatusFilter] = useState("active");
   const [showCreatePrice, setShowCreatePrice] = useState(false);
   const [showCreateEvent, setShowCreateEvent] = useState(false);
-  const [daoTotalStake, setDaoTotalStake] = useState(null);
 
-  // Unified single-market refresh: routes to price or event based on isEvent flag
   const refreshSingle = useCallback(
     (marketPubkey, isEvent) => {
       if (isEvent) {
@@ -1447,26 +1424,15 @@ export default function PredictionMarketPlace() {
     priceMarkets.filter((m) => !m.account.resolved).length +
     eventMarkets.filter((m) => !m.account.resolved).length;
 
-  // After creating a market, add it to the list & keep modal open for options
-  const handlePriceMarketCreated = useCallback(
-    (result) => {
-      refresh();
-    },
-    [refresh]
-  );
-  const handleEventMarketCreated = useCallback(
-    (result) => {
-      refresh();
-    },
-    [refresh]
-  );
+  const handlePriceMarketCreated = useCallback(() => { refresh(); }, [refresh]);
+  const handleEventMarketCreated = useCallback(() => { refresh(); }, [refresh]);
 
   return (
     <div className="relative min-h-screen grid-bg">
       <div className="absolute top-0 right-1/4 w-[500px] h-[300px] rounded-full bg-accent/3 blur-[160px] pointer-events-none" />
 
       <div className="relative z-10 max-w-5xl mx-auto px-6 py-10">
-        {/* ── Header ────────────────────────────────────────────────────────── */}
+        {/* ── Header ── */}
         <div className="flex items-start justify-between gap-4 mb-8 flex-wrap">
           <div>
             <span className="text-[10px] font-mono text-accent uppercase tracking-[0.2em] block mb-1">
@@ -1505,7 +1471,7 @@ export default function PredictionMarketPlace() {
           </div>
         </div>
 
-        {/* ── Main tabs ─────────────────────────────────────────────────────── */}
+        {/* ── Main tabs ── */}
         <div className="flex gap-1 mb-8 p-1 rounded-xl bg-dim border border-border w-fit">
           <Pill active={mainTab === "markets"} onClick={() => setMainTab("markets")}>
             Markets
@@ -1528,7 +1494,7 @@ export default function PredictionMarketPlace() {
           />
         ) : (
           <>
-            {/* ── Filters ───────────────────────────────────────────────────── */}
+            {/* ── Filters ── */}
             <div className="flex items-center gap-3 mb-6 flex-wrap">
               <div className="flex gap-1 p-1 rounded-xl bg-dim border border-border">
                 {[
@@ -1564,7 +1530,7 @@ export default function PredictionMarketPlace() {
               </span>
             </div>
 
-            {/* ── Market grid ───────────────────────────────────────────────── */}
+            {/* ── Market grid ── */}
             {loading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-52" />)}
