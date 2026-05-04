@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useProgram } from "./useProgram";
 
 export function useMarkets() {
@@ -7,17 +7,18 @@ export function useMarkets() {
   const [eventMarkets, setEventMarkets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const inFlight = useRef(false);
 
   const load = useCallback(async () => {
     if (!program) return;
+    if (inFlight.current) return;
+    inFlight.current = true;
     setLoading(true);
     setError(null);
     try {
-      const [pm, em] = await Promise.all([
-        program.account.market.all().catch(() => []),
-        program.account.eventMarket.all().catch(() => []),
-      ]);
-      // Sort: unresolved first, then by id desc
+      const pm = await program.account.market.all().catch(() => []);
+      const em = await program.account.eventMarket.all().catch(() => []);
+
       const sort = (arr) =>
         [...arr].sort((a, b) => {
           if (a.account.resolved !== b.account.resolved)
@@ -35,12 +36,74 @@ export function useMarkets() {
       setError(err?.message ?? "Failed to load markets");
     } finally {
       setLoading(false);
+      inFlight.current = false;
     }
   }, [program]);
+
+  // Refresh a single price market by its publicKey
+  const refreshSinglePriceMarket = useCallback(
+    async (marketPubkey) => {
+      if (!program) return;
+      try {
+        const updated = await program.account.market.fetch(marketPubkey);
+        setPriceMarkets((prev) =>
+          prev.map((m) =>
+            m.publicKey.toBase58() === marketPubkey.toBase58()
+              ? { ...m, account: updated }
+              : m
+          )
+        );
+      } catch (err) {
+        console.error("refreshSinglePriceMarket:", err);
+        // fall back to full reload
+        load();
+      }
+    },
+    [program, load]
+  );
+
+  // Refresh a single event market by its publicKey
+  const refreshSingleEventMarket = useCallback(
+    async (marketPubkey) => {
+      if (!program) return;
+      try {
+        const updated = await program.account.eventMarket.fetch(marketPubkey);
+        setEventMarkets((prev) =>
+          prev.map((m) =>
+            m.publicKey.toBase58() === marketPubkey.toBase58()
+              ? { ...m, account: updated }
+              : m
+          )
+        );
+      } catch (err) {
+        console.error("refreshSingleEventMarket:", err);
+        load();
+      }
+    },
+    [program, load]
+  );
 
   useEffect(() => {
     load();
   }, [load]);
 
-  return { priceMarkets, eventMarkets, loading, error, refresh: load };
+  const lastRefresh = useRef(0);
+  const refresh = useCallback(() => {
+    const now = Date.now();
+    if (now - lastRefresh.current < 2000) return;
+    lastRefresh.current = now;
+    load();
+  }, [load]);
+
+  return {
+    priceMarkets,
+    eventMarkets,
+    loading,
+    error,
+    refresh,
+    refreshSinglePriceMarket,
+    refreshSingleEventMarket,
+    setPriceMarkets,
+    setEventMarkets,
+  };
 }

@@ -112,11 +112,17 @@ export function useCreatePriceMarket(onSuccess) {
       );
       const [userPda] = getUserPdaFromKey(publicKey, program.programId);
 
-      // Determine price feed from questionTypeObj
+      // Determine price feed pubkey — it comes in as a string from the form
       const feedKey = Object.values(questionTypeObj)[0]?.priceFeed;
-      const priceFeedPk = feedKey
-        ? new PublicKey(feedKey)
-        : PublicKey.default;
+      const priceFeedPk = feedKey ? new PublicKey(feedKey) : PublicKey.default;
+
+      // Anchor requires PublicKey objects inside the enum variant, not strings.
+      // The form sets priceFeed as a string address — convert it in-place.
+      const variantKey = Object.keys(questionTypeObj)[0];
+      const variantVal = questionTypeObj[variantKey];
+      if (variantVal?.priceFeed && typeof variantVal.priceFeed === "string") {
+        variantVal.priceFeed = new PublicKey(variantVal.priceFeed);
+      }
 
       await program.methods
         .createMarket(
