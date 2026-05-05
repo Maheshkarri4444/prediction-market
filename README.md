@@ -4,6 +4,25 @@ A decentralized prediction marketplace built on Solana, enabling users to create
 
 ---
 
+## 🧠 About the Project
+
+This project is a fully on-chain **Prediction Marketplace Protocol built on Solana**, supporting both **token price-based markets** (powered by Pyth oracles) and **event-based markets governed by a DAO**.
+
+Users can create markets, provide liquidity, and trade outcome shares dynamically, while event markets are resolved through a **stake-weighted consensus mechanism** with economic incentives for truthful participation. The system combines **AMM-style pricing**, **oracle integration**, and **DAO governance** into a single cohesive protocol.
+
+From a development perspective, this project significantly deepened my understanding of:
+
+- Solana account model and PDA design  
+- Secure fund handling and lamports management  
+- Anchor framework and instruction architecture  
+- Oracle integration (Pyth) and deterministic resolution  
+- Designing incentive-compatible systems (staking, slashing, rewards)  
+- Building full-stack dApps with real-time state synchronization  
+
+Overall, this project served as a hands-on exploration of building **production-grade Solana protocols**, strengthening both my smart contract and frontend integration skills.
+
+---
+
 ## ⚙️ Tech Stack
 
 - **Solana (Rust + Anchor)** — smart contracts & on-chain logic  
