@@ -4,8 +4,7 @@ import { clusterApiUrl } from "@solana/web3.js";
 export const NETWORK = "devnet";
 export const RPC_ENDPOINT = clusterApiUrl("devnet");
 
-// ⚠️ Replace with your deployed program ID
-export const PROGRAM_ID = new PublicKey("HMYsLuDhjARNTLb5eTbZS6aiJSfHgZ1tDwkJTMF2tKs3");
+export const PROGRAM_ID = new PublicKey("4yYvNcyawCyUyhGdbvy2dqybVz5NYKm7Ya9hDMUXJ1yJ");
 
 export const PYTH_FEED_SYMBOLS = {
   EdVCmQ9FSPcVe5YySXDPCRmc8aDQLKJ9xvYBMZPie1Vw: { symbol: "ETH", name: "Ethereum" },
