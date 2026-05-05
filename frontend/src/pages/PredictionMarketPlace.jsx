@@ -16,6 +16,7 @@ import { useCreateOrder, useCreateEventOrder, computeOptionPrice } from "../hook
 import { useClaimReward, useClaimEventReward, useClaimablePositions } from "../hooks/useClaimReward";
 import { PYTH_FEED_SYMBOLS } from "../constants";
 import { useProgram } from "../hooks/useProgram";
+import { ToastProvider, useToast } from "../hooks/useToast";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const lamToSol = (bn) => {
@@ -40,6 +41,7 @@ const timeLeft = (bn) => {
     return `${m}m`;
   } catch { return "—"; }
 };
+
 const getFeedInfo = (pkOrStr) => {
   const k = pkOrStr?.toBase58?.() ?? String(pkOrStr ?? "");
   return PYTH_FEED_SYMBOLS[k] ?? { symbol: "?", name: k.slice(0, 8) };
@@ -114,7 +116,6 @@ const getEventMarketResolveStatus = (acc, daoTotalStake) => {
     const now = Date.now();
     const eventEnded = now > acc.eventEndTime.toNumber() * 1000;
     if (!eventEnded) return "time_pending";
-
     const totalVoted = (acc.options ?? []).reduce(
       (s, o) => s + (o.stakeVoted?.toNumber?.() ?? 0), 0
     );
@@ -140,12 +141,8 @@ function useDaoTotalStake() {
           program.programId
         );
         const daoAcc = await program.account.dao.fetch(daoPda);
-        if (!cancelled && daoAcc?.daoTotalStake) {
-          setDaoTotalStake(daoAcc.daoTotalStake);
-        }
-      } catch (e) {
-        // DAO may not be initialized — silently ignore
-      }
+        if (!cancelled && daoAcc?.daoTotalStake) setDaoTotalStake(daoAcc.daoTotalStake);
+      } catch { /* DAO may not be initialized */ }
     })();
     return () => { cancelled = true; };
   }, [program]);
@@ -217,22 +214,97 @@ function Input({ label, value, onChange, placeholder, type = "text", hint, requi
   );
 }
 
-function Select({ label, value, onChange, options, required }) {
+function Select({ label, value, onChange, options, required, searchable = false }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e) {
+      if (containerRef.current && !containerRef.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  if (!searchable) {
+    return (
+      <div>
+        <label className="block text-[10px] font-mono text-white/40 uppercase tracking-widest mb-1.5">
+          {label}{required && <span className="text-accent ml-1">*</span>}
+        </label>
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full bg-dim border border-border rounded-xl px-4 py-2.5 text-white text-sm font-mono outline-none focus:border-accent/50 transition-all"
+        >
+          <option value="">Select…</option>
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+      </div>
+    );
+  }
+
+  const selectedLabel = value ? (options.find((o) => o.value === value)?.label ?? value) : null;
+  const filtered = options.filter((o) =>
+    o.label.toLowerCase().includes(search.toLowerCase()) ||
+    o.value.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
-    <div>
+    <div ref={containerRef} className="relative">
       <label className="block text-[10px] font-mono text-white/40 uppercase tracking-widest mb-1.5">
         {label}{required && <span className="text-accent ml-1">*</span>}
       </label>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-dim border border-border rounded-xl px-4 py-2.5 text-white text-sm font-mono outline-none focus:border-accent/50 transition-all"
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full bg-dim border border-border rounded-xl px-4 py-2.5 text-left text-sm font-mono outline-none focus:border-accent/50 transition-all flex items-center justify-between gap-2"
       >
-        <option value="">Select…</option>
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
+        <span className={selectedLabel ? "text-white" : "text-white/25"}>
+          {selectedLabel ?? "— Select a feed —"}
+        </span>
+        <span className={`text-white/30 text-xs transition-transform duration-150 ${open ? "rotate-180" : ""}`}>▼</span>
+      </button>
+
+      {open && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1 rounded-xl border border-border bg-panel shadow-2xl overflow-hidden">
+          <div className="p-2 border-b border-border/50">
+            <input
+              autoFocus
+              type="text"
+              placeholder="Search…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-dim border border-border rounded-lg px-3 py-2 text-white text-xs font-mono placeholder-white/20 outline-none focus:border-accent/50 transition-all"
+            />
+          </div>
+          <div className="max-h-52 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <div className="px-4 py-3 text-xs font-mono text-white/25">No feeds match "{search}"</div>
+            ) : (
+              filtered.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => { onChange(o.value); setSearch(""); setOpen(false); }}
+                  className={`w-full text-left px-4 py-2.5 text-xs font-mono transition-colors hover:bg-white/5 ${
+                    o.value === value ? "text-accent bg-accent/5" : "text-white/70"
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))
+            )}
+          </div>
+          <div className="px-4 py-1.5 border-t border-border/50">
+            <span className="text-[9px] font-mono text-white/20">{filtered.length} devnet feeds</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -270,7 +342,7 @@ function OptionBar({ option, allOptions, index, isWinner, label, myOptionIndices
         </div>
         <div className="flex items-center gap-3">
           <span className={`text-sm font-mono font-bold ${isWinner ? "text-accent" : "text-white"}`}>
-            {pct}$
+            {pct}%
           </span>
           {onBuy && (
             <button
@@ -319,28 +391,41 @@ function OrderRow({ order, isMine, market, isEvent }) {
   );
 }
 
-// ── BuyModal ──────────────────────────────────────────────────────────────────
+// ── BuyModal ─────────────────────────────────────────────────────────────────
+// FIX (toast): hooks re-throw, so catch here shows real error in toast.
 function BuyModal({ market, optionIndex, isEvent, onClose, onRefreshSingle }) {
+  const { toast } = useToast();
   const [qty, setQty] = useState("1000000");
 
   const handleRefresh = useCallback(() => {
     onRefreshSingle(market.publicKey);
   }, [market.publicKey, onRefreshSingle]);
 
-  const { createOrder, loading: lo, error: eo } = useCreateOrder(handleRefresh);
-  const { createEventOrder, loading: le, error: ee } = useCreateEventOrder(handleRefresh);
+  const { createOrder, loading: lo } = useCreateOrder(handleRefresh);
+  const { createEventOrder, loading: le } = useCreateEventOrder(handleRefresh);
 
   const options = market.account.options ?? [];
   const opt = options[optionIndex];
   const price = opt ? computeOptionPrice(opt, options) : 0;
   const estSol = opt ? (price * parseInt(qty || "0") / 1e6) : 0;
   const label = getOptionLabel(optionIndex, market.account, isEvent);
-  const err = eo || ee;
 
   const handle = async () => {
-    if (isEvent) await createEventOrder(market, optionIndex, parseInt(qty));
-    else await createOrder(market, optionIndex, parseInt(qty));
-    onClose();
+    try {
+      if (isEvent) {
+        await createEventOrder(market, optionIndex, parseInt(qty));
+      } else {
+        await createOrder(market, optionIndex, parseInt(qty));
+      }
+      // Only reaches here if no error thrown
+      toast.success("Order placed successfully!");
+      onClose();
+    } catch (e) {
+      // Anchor errors often have the human message after "Error Message:"
+      const raw = e?.message ?? "Failed to place order";
+      const match = raw.match(/Error Message: (.+?)(?:\.|$)/);
+      toast.error(match ? match[1] : raw);
+    }
   };
 
   return (
@@ -358,7 +443,7 @@ function BuyModal({ market, optionIndex, isEvent, onClose, onRefreshSingle }) {
         <div className="mb-4 p-3 rounded-xl bg-dim border border-border">
           <div className="flex justify-between text-xs font-mono">
             <span className="text-white/40">Price per share</span>
-            <span className="text-white font-bold">{(price * 100).toFixed(2)}¢</span>
+            <span className="text-white font-bold">{(price * 100).toFixed(2)}%</span>
           </div>
           <div className="flex justify-between text-xs font-mono mt-1">
             <span className="text-white/40">Est. cost</span>
@@ -379,8 +464,6 @@ function BuyModal({ market, optionIndex, isEvent, onClose, onRefreshSingle }) {
           <p className="text-[10px] font-mono text-white/20 mt-1">1,000,000 = 1 token (6 decimals)</p>
         </div>
 
-        <ErrMsg msg={err} />
-
         <button
           onClick={handle}
           disabled={lo || le || !qty}
@@ -394,6 +477,8 @@ function BuyModal({ market, optionIndex, isEvent, onClose, onRefreshSingle }) {
 }
 
 // ── MarketCard ────────────────────────────────────────────────────────────────
+// FIX (add option): addOption/addEventOption take a PublicKey directly,
+// matching the original hook signatures exactly.
 function MarketCard({
   market,
   isEvent,
@@ -403,6 +488,7 @@ function MarketCard({
   isMyMarket,
 }) {
   const { publicKey } = useWallet();
+  const { toast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [buyOption, setBuyOption] = useState(null);
   const [optimisticResolved, setOptimisticResolved] = useState(false);
@@ -413,7 +499,9 @@ function MarketCard({
   const bettingClosed = useBettingClosed(acc.marketEndTime);
 
   const isCreator =
-    publicKey && acc.authority && acc.authority.toBase58() === publicKey.toBase58();
+    publicKey != null &&
+    acc.authority != null &&
+    acc.authority.toBase58() === publicKey.toBase58();
 
   const myOptionIndices = myOrders
     ?.filter((o) => o.account.market.toBase58() === market.publicKey.toBase58())
@@ -439,27 +527,63 @@ function MarketCard({
     onRefreshSingle(market.publicKey);
   }, [market.publicKey, onRefreshSingle]);
 
-  const { resolveMarket, loading: rpl } = useResolvePriceMarket(handleResolved);
-  const { resolveEventMarket, loading: rel } = useResolveEventMarket(handleResolved);
+  const { resolveMarket, loading: rpl, error: rpe } = useResolvePriceMarket(handleResolved);
+  const { resolveEventMarket, loading: rel, error: ree } = useResolveEventMarket(handleResolved);
 
-  const handleOptionAdded = useCallback(() => {
+  useEffect(() => { if (rpe) toast.error(rpe); }, [rpe]);
+  useEffect(() => { if (ree) toast.error(ree); }, [ree]);
+
+  // FIX (add option): pass market.publicKey (a PublicKey) — matches hook signature
+  const { addOption, loading: aol, error: aoe } = useAddOptionDetails(() => {
     onRefreshSingle(market.publicKey);
-  }, [market.publicKey, onRefreshSingle]);
+  });
+  const { addEventOption, loading: aeol, error: aeoe } = useAddEventOption(() => {
+    onRefreshSingle(market.publicKey);
+  });
 
-  const { addOption, loading: aol } = useAddOptionDetails(handleOptionAdded);
-  const { addEventOption, loading: aeol } = useAddEventOption(handleOptionAdded);
+  useEffect(() => { if (aoe) toast.error(aoe); }, [aoe]);
+  useEffect(() => { if (aeoe) toast.error(aeoe); }, [aeoe]);
+
+  const handleResolve = async () => {
+    try {
+      await resolveMarket(market, getPriceFeedFromQt(acc.questionType));
+      toast.success("Market resolved!");
+    } catch (e) {
+      toast.error(e?.message ?? "Failed to resolve market");
+    }
+  };
+
+  const handleResolveEvent = async () => {
+    try {
+      await resolveEventMarket(market);
+      toast.success("Event market resolved!");
+    } catch (e) {
+      toast.error(e?.message ?? "Failed to resolve event market");
+    }
+  };
+
+  const handleAddOption = async () => {
+    try {
+      if (isEvent) {
+        await addEventOption(market.publicKey);
+      } else {
+        await addOption(market.publicKey);
+      }
+      toast.success(`Option ${options.length + 1} added`);
+    } catch (e) {
+      toast.error(e?.message ?? "Failed to add option");
+    }
+  };
 
   return (
     <>
-      <div
-        className={`rounded-2xl border transition-all duration-200 overflow-hidden ${
-          isResolved
-            ? "border-border/40 bg-panel/60"
-            : hasMine
-            ? "border-accent/30 bg-panel"
-            : "border-border bg-panel hover:border-accent/20"
-        }`}
-      >
+      <div className={`rounded-2xl border transition-all duration-200 overflow-hidden ${
+        isResolved
+          ? "border-border/40 bg-panel/60"
+          : hasMine
+          ? "border-accent/30 bg-panel"
+          : "border-border bg-panel hover:border-accent/20"
+      }`}>
         <div className="h-0.5 w-full" style={{
           background: isResolved
             ? "rgba(255,255,255,0.05)"
@@ -532,11 +656,7 @@ function MarketCard({
                 Add options to start market ({options.length}/{acc.numOptions})
               </p>
               <button
-                onClick={() =>
-                  isEvent
-                    ? addEventOption(market.publicKey)
-                    : addOption(market.publicKey)
-                }
+                onClick={handleAddOption}
                 disabled={aol || aeol}
                 className="text-xs font-mono text-black bg-gold hover:bg-gold/80 px-4 py-1.5 rounded-lg transition-all font-semibold disabled:opacity-40"
               >
@@ -548,7 +668,7 @@ function MarketCard({
           <div className="flex items-center gap-2 mt-3 flex-wrap">
             {canResolve && (
               <button
-                onClick={() => resolveMarket(market, getPriceFeedFromQt(acc.questionType))}
+                onClick={handleResolve}
                 disabled={rpl}
                 className="text-xs font-mono text-black bg-accent hover:bg-accent/80 px-4 py-1.5 rounded-lg transition-all font-semibold disabled:opacity-40"
               >
@@ -557,7 +677,7 @@ function MarketCard({
             )}
             {isEvent && !isResolved && eventResolveStatus === "can_resolve" && (
               <button
-                onClick={() => resolveEventMarket(market)}
+                onClick={handleResolveEvent}
                 disabled={rel}
                 className="text-xs font-mono text-black bg-gold hover:bg-gold/80 px-4 py-1.5 rounded-lg transition-all font-semibold disabled:opacity-40"
               >
@@ -566,7 +686,7 @@ function MarketCard({
             )}
             {isEvent && !isResolved && eventResolveStatus === "quorum_pending" && (
               <span className="text-[10px] font-mono text-gold/50 flex items-center gap-1">
-                <span>⏳</span> Quorum not yet reached
+                ⏳ Quorum not yet reached
               </span>
             )}
           </div>
@@ -574,14 +694,8 @@ function MarketCard({
 
         {expanded && (
           <div className="border-t border-border/40 px-5 py-4">
-            <p className="text-[10px] font-mono text-white/30 uppercase tracking-widest mb-3">
-              All Orders
-            </p>
-            <OrdersLoader
-              market={market}
-              isEvent={isEvent}
-              myPublicKey={publicKey}
-            />
+            <p className="text-[10px] font-mono text-white/30 uppercase tracking-widest mb-3">All Orders</p>
+            <OrdersLoader market={market} isEvent={isEvent} myPublicKey={publicKey} />
           </div>
         )}
       </div>
@@ -602,6 +716,7 @@ function MarketCard({
 // ── Per-market orders loader ──────────────────────────────────────────────────
 function useOrdersForMarket(marketPubkey) {
   const program = useProgram();
+  const { toast } = useToast();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -613,6 +728,8 @@ function useOrdersForMarket(marketPubkey) {
         const all = await program.account.order.all().catch(() => []);
         const mKey = marketPubkey.toBase58();
         if (!cancelled) setOrders(all.filter((o) => o.account.market.toBase58() === mKey));
+      } catch (e) {
+        if (!cancelled) toast.error("Failed to load orders: " + (e?.message ?? "Unknown error"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -625,17 +742,15 @@ function useOrdersForMarket(marketPubkey) {
 
 function OrdersLoader({ market, isEvent, myPublicKey }) {
   const { orders, loading } = useOrdersForMarket(market.publicKey);
-
   if (loading) return <div className="text-[10px] font-mono text-white/20">Loading orders…</div>;
   if (!orders.length) return <div className="text-[10px] font-mono text-white/20">No orders yet.</div>;
-
   return (
     <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
       {orders.map((o) => (
         <OrderRow
           key={o.publicKey.toBase58()}
           order={o}
-          isMine={myPublicKey && o.account.buyer.toBase58() === myPublicKey.toBase58()}
+          isMine={myPublicKey != null && o.account.buyer.toBase58() === myPublicKey.toBase58()}
           market={market}
           isEvent={isEvent}
         />
@@ -648,59 +763,35 @@ function OrdersLoader({ market, isEvent, myPublicKey }) {
 function ClaimTab({ priceMarkets, eventMarkets, myOrders, onRefreshSingle }) {
   const { publicKey } = useWallet();
   const { connection } = useConnection();
+  const { toast } = useToast();
   const { positions, loading, reload } = useClaimablePositions(
-    priceMarkets,
-    eventMarkets,
-    myOrders,
-    connection
+    priceMarkets, eventMarkets, myOrders, connection
   );
 
-  useEffect(() => {
-    if (publicKey) reload();
-  }, [publicKey, priceMarkets.length, eventMarkets.length, myOrders.length]);
+  useEffect(() => { if (publicKey) reload(); }, [publicKey, priceMarkets.length, eventMarkets.length, myOrders.length]);
 
-  const handleClaimSuccess = useCallback(
-    (marketPubkey) => {
-      onRefreshSingle(marketPubkey);
-      setTimeout(() => reload(), 2000);
-    },
-    [onRefreshSingle, reload]
+  const handleClaimSuccess = useCallback((marketPubkey) => {
+    onRefreshSingle(marketPubkey);
+    setTimeout(() => reload(), 2000);
+  }, [onRefreshSingle, reload]);
+
+  if (!publicKey) return (
+    <p className="text-white/20 font-mono text-sm text-center py-8">Connect your wallet to see claimable positions.</p>
   );
 
-  if (!publicKey) {
-    return (
-      <p className="text-white/20 font-mono text-sm text-center py-8">
-        Connect your wallet to see claimable positions.
-      </p>
-    );
-  }
+  if (loading) return (
+    <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24" />)}</div>
+  );
 
-  if (loading) {
-    return (
-      <div className="space-y-3">
-        {[...Array(3)].map((_, i) => (
-          <Skeleton key={i} className="h-24" />
-        ))}
-      </div>
-    );
-  }
-
-  if (positions.length === 0) {
-    return (
-      <div className="py-16 text-center">
-        <p className="text-white/20 font-mono text-sm">No claimable positions found.</p>
-        <p className="text-white/10 font-mono text-xs mt-1">
-          Positions appear here once you have tokens in resolved or pending markets.
-        </p>
-        <button
-          onClick={reload}
-          className="mt-4 px-4 py-2 rounded-xl border border-border text-white/30 hover:text-white text-xs font-mono transition-all"
-        >
-          Refresh
-        </button>
-      </div>
-    );
-  }
+  if (positions.length === 0) return (
+    <div className="py-16 text-center">
+      <p className="text-white/20 font-mono text-sm">No claimable positions found.</p>
+      <p className="text-white/10 font-mono text-xs mt-1">Positions appear here once you have tokens in resolved or pending markets.</p>
+      <button onClick={reload} className="mt-4 px-4 py-2 rounded-xl border border-border text-white/30 hover:text-white text-xs font-mono transition-all">
+        Refresh
+      </button>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
@@ -708,26 +799,16 @@ function ClaimTab({ priceMarkets, eventMarkets, myOrders, onRefreshSingle }) {
         <p className="text-[10px] font-mono text-white/30 uppercase tracking-widest">
           {positions.length} position{positions.length !== 1 ? "s" : ""} found
         </p>
-        <button
-          onClick={reload}
-          className="text-[10px] font-mono text-white/30 hover:text-white transition-colors"
-        >
-          ↻ Refresh
-        </button>
+        <button onClick={reload} className="text-[10px] font-mono text-white/30 hover:text-white transition-colors">↻ Refresh</button>
       </div>
-      {positions.map((pos, i) => (
-        <ClaimCard
-          key={i}
-          position={pos}
-          onSuccess={handleClaimSuccess}
-        />
-      ))}
+      {positions.map((pos, i) => <ClaimCard key={i} position={pos} onSuccess={handleClaimSuccess} />)}
     </div>
   );
 }
 
 function ClaimCard({ position, onSuccess }) {
   const { market, isEvent, optionIndex, tokenMint, tokenBalance, isWinner } = position;
+  const { toast } = useToast();
   const acc = market.account;
   const label = getOptionLabel(optionIndex, acc, isEvent);
 
@@ -738,13 +819,25 @@ function ClaimCard({ position, onSuccess }) {
   const { claimReward, loading: cl, error: ce } = useClaimReward(handleSuccess);
   const { claimEventReward, loading: el, error: ee } = useClaimEventReward(handleSuccess);
 
+  useEffect(() => { if (ce) toast.error(ce); }, [ce]);
+  useEffect(() => { if (ee) toast.error(ee); }, [ee]);
+
   const isResolved = acc.resolved;
   const statusColor =
     isWinner === true ? "border-accent/30 bg-accent/5" :
     isWinner === false ? "border-red-500/20 bg-red-500/5" :
     "border-border bg-panel";
-
   const canClaim = isResolved && tokenBalance > 0;
+
+  const handleClaim = async () => {
+    try {
+      if (isEvent) await claimEventReward(market, tokenMint);
+      else await claimReward(market, tokenMint);
+      toast.success(isWinner ? "Reward claimed! 🎉" : "Tokens burned successfully.");
+    } catch (e) {
+      toast.error(e?.message ?? "Claim failed");
+    }
+  };
 
   return (
     <div className={`p-4 rounded-2xl border ${statusColor} transition-all`}>
@@ -753,62 +846,41 @@ function ClaimCard({ position, onSuccess }) {
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <Badge color={isEvent ? "gold" : "green"}>{isEvent ? "Event" : "Price"}</Badge>
             {isResolved ? (
-              isWinner
-                ? <Badge color="green">Winner ✓</Badge>
-                : <Badge color="red">Lost</Badge>
+              isWinner ? <Badge color="green">Winner ✓</Badge> : <Badge color="red">Lost</Badge>
             ) : (
               <Badge color="default">Pending Resolution</Badge>
             )}
           </div>
-          <p className="text-xs font-mono text-white/70 line-clamp-2 mb-1">
-            {acc.question}
-          </p>
+          <p className="text-xs font-mono text-white/70 line-clamp-2 mb-1">{acc.question}</p>
           <div className="flex items-center gap-4 text-[10px] font-mono text-white/30">
             <span>Option: <span className={isWinner ? "text-accent" : "text-white/50"}>{label}</span></span>
             <span>Balance: <span className="text-white/60">{(tokenBalance / 1e6).toFixed(2)} tokens</span></span>
           </div>
         </div>
-
         <div className="flex-shrink-0">
           {canClaim && (
             <button
               disabled={cl || el}
-              onClick={() =>
-                isEvent
-                  ? claimEventReward(market, tokenMint)
-                  : claimReward(market, tokenMint)
-              }
+              onClick={handleClaim}
               className={`px-4 py-2 rounded-xl text-xs font-mono font-bold uppercase tracking-widest transition-all disabled:opacity-40 ${
-                isWinner
-                  ? "bg-accent text-black hover:bg-accent/80"
-                  : "bg-white/10 text-white/50 hover:bg-white/20"
+                isWinner ? "bg-accent text-black hover:bg-accent/80" : "bg-white/10 text-white/50 hover:bg-white/20"
               }`}
             >
               {cl || el ? "Claiming…" : isWinner ? "Claim Reward" : "Burn Tokens"}
             </button>
           )}
-          {!isResolved && (
-            <span className="text-[10px] font-mono text-white/25 whitespace-nowrap">
-              Awaiting resolution
-            </span>
-          )}
+          {!isResolved && <span className="text-[10px] font-mono text-white/25 whitespace-nowrap">Awaiting resolution</span>}
         </div>
       </div>
-
       {(ce || ee) && <ErrMsg msg={ce || ee} />}
-
       {isWinner && isResolved && (
         <div className="mt-2 pt-2 border-t border-accent/10">
-          <p className="text-[10px] font-mono text-accent/60">
-            🎉 You picked the winning option. Claim your share of the pool.
-          </p>
+          <p className="text-[10px] font-mono text-accent/60">🎉 You picked the winning option. Claim your share of the pool.</p>
         </div>
       )}
       {isWinner === false && isResolved && (
         <div className="mt-2 pt-2 border-t border-red-500/10">
-          <p className="text-[10px] font-mono text-red-400/40">
-            Burn your tokens to clear the position. No reward for this one.
-          </p>
+          <p className="text-[10px] font-mono text-red-400/40">Burn your tokens to clear the position. No reward for this one.</p>
         </div>
       )}
     </div>
@@ -816,7 +888,12 @@ function ClaimCard({ position, onSuccess }) {
 }
 
 // ── Create Price Market Modal ──────────────────────────────────────────────────
+// FIX (add option): in the post-creation step, addOption receives market.publicKey
+//   — a PublicKey — matching the hook's signature exactly.
+// FIX (time ordering): Betting End (left) must be < Target Time (right).
+// FIX (feeds): Only confirmed devnet pubkeys from PYTH_FEED_SYMBOLS.
 function CreatePriceMarketModal({ onClose, onCreated }) {
+  const { toast } = useToast();
   const [qType, setQType] = useState("greaterThanAtTime");
   const [feed, setFeed] = useState("");
   const [targetPrice, setTargetPrice] = useState("");
@@ -826,25 +903,42 @@ function CreatePriceMarketModal({ onClose, onCreated }) {
   const [targetTime, setTargetTime] = useState("");
   const [marketEndTime, setMarketEndTime] = useState("");
   const [question, setQuestion] = useState("");
-  const [rangeOptions, setRangeOptions] = useState([
-    { lower: "", upper: "" },
-    { lower: "", upper: "" },
-  ]);
+  const [rangeOptions, setRangeOptions] = useState([{ lower: "", upper: "" }, { lower: "", upper: "" }]);
   const [createdMarket, setCreatedMarket] = useState(null);
+  const createdMarketRef = useRef(null);
+  const [optionsAdded, setOptionsAdded] = useState(0);
 
-  const { createMarket, loading, error } = useCreatePriceMarket((result) => {
-    setCreatedMarket(result);
-    onCreated(result);
+  const program = useProgram();
+
+  const { createMarket, loading, error } = useCreatePriceMarket(async (result) => {
+    // result = { marketPda: PublicKey, nextId: number }
+    let fullMarket = null;
+    try {
+      const acc = await program.account.priceMarket.fetch(result.marketPda);
+      fullMarket = { publicKey: result.marketPda, account: acc };
+    } catch {
+      // fallback: create a minimal shell so addOption still gets the PublicKey
+      fullMarket = { publicKey: result.marketPda, account: null };
+    }
+    setCreatedMarket(fullMarket);
+    createdMarketRef.current = fullMarket;
+    onCreated(fullMarket);
   });
 
-  const { addOption, loading: aol, error: aoErr } = useAddOptionDetails(() => {
-    onCreated(createdMarket);
+  // FIX (add option): addOption takes a PublicKey — pass createdMarketRef.current.publicKey
+  const { addOption, loading: aol, error: aoe } = useAddOptionDetails(() => {
+    if (createdMarketRef.current) onCreated(createdMarketRef.current);
   });
 
-  const feedOptions = Object.entries(PYTH_FEED_SYMBOLS).map(([k, v]) => ({
-    value: k,
-    label: `${v.symbol} — ${v.name}`,
-  }));
+  useEffect(() => { if (aoe) toast.error(aoe); }, [aoe]);
+
+  // Only devnet-confirmed pubkeys from constants
+  const feedOptions = useMemo(() =>
+    Object.entries(PYTH_FEED_SYMBOLS).map(([pubkey, info]) => ({
+      value: pubkey,
+      label: `${info.symbol} — ${info.name}`,
+    })),
+  []);
 
   const qTypeOptions = [
     { value: "greaterThanAtTime", label: "Greater than price at time" },
@@ -854,6 +948,13 @@ function CreatePriceMarketModal({ onClose, onCreated }) {
     { value: "percentageDown", label: "Price drops by %" },
     { value: "rangeOfPrice", label: "Price range buckets (multi-option)" },
   ];
+
+  const isRange = qType === "rangeOfPrice";
+  const isPercent = qType === "percentageUp" || qType === "percentageDown";
+  const isSingleRange = qType === "rangeAtTime";
+  const needsTarget = !isPercent && !isRange && !isSingleRange;
+  const numOptions = isRange ? rangeOptions.length : 2;
+  const allOptionsAdded = optionsAdded >= numOptions;
 
   const buildQuestionType = () => {
     const feedPk = new PublicKey(feed);
@@ -882,27 +983,48 @@ function CreatePriceMarketModal({ onClose, onCreated }) {
     return null;
   };
 
-  const numOptions = qType === "rangeOfPrice" ? rangeOptions.length : 2;
-
   const submit = async () => {
-    const qt = buildQuestionType();
+    if (!feed) { toast.error("Please select a price feed"); return; }
+    if (!question) { toast.error("Please enter a question"); return; }
+    if (!marketEndTime) { toast.error("Please set a betting end time"); return; }
+    if (!targetTime) { toast.error("Please set a target time"); return; }
+
+    // FIX (time ordering): betting end must be before target time
+    const metMs = new Date(marketEndTime).getTime();
+    const ttMs = new Date(targetTime).getTime();
+    if (metMs >= ttMs) {
+      toast.error("Betting end time must be earlier than the target time");
+      return;
+    }
+
+    let qt;
+    try { qt = buildQuestionType(); } catch (e) {
+      toast.error(e?.message ?? "Invalid parameters");
+      return;
+    }
     if (!qt) return;
-    const met = Math.floor(new Date(marketEndTime).getTime() / 1000);
-    await createMarket({ questionTypeObj: qt, question, marketEndTime: met });
+
+    try {
+      await createMarket({ questionTypeObj: qt, question, marketEndTime: Math.floor(metMs / 1000) });
+      toast.success("Price market created!");
+    } catch (e) {
+      toast.error(e?.message ?? "Failed to create market");
+    }
   };
 
-  const isRange = qType === "rangeOfPrice";
-  const isPercent = qType === "percentageUp" || qType === "percentageDown";
-  const isSingleRange = qType === "rangeAtTime";
-  const needsTarget = !isPercent && !isRange && !isSingleRange;
-
-  const [optionsAdded, setOptionsAdded] = useState(0);
   const handleAddOption = async () => {
-    if (!createdMarket) return;
-    await addOption(createdMarket.publicKey ?? createdMarket);
-    setOptionsAdded((n) => n + 1);
+    const mkt = createdMarketRef.current;
+    if (!mkt?.publicKey) { toast.error("Market not ready — please try again"); return; }
+    try {
+      // FIX (add option): pass PublicKey directly — matches useAddOptionDetails signature
+      await addOption(mkt.publicKey);
+      setOptionsAdded((n) => n + 1);
+      toast.success(`Option ${optionsAdded + 1} added`);
+      if (createdMarketRef.current) onCreated(createdMarketRef.current);
+    } catch (e) {
+      toast.error(e?.message ?? "Failed to add option");
+    }
   };
-  const allOptionsAdded = optionsAdded >= numOptions;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8 overflow-y-auto">
@@ -921,7 +1043,15 @@ function CreatePriceMarketModal({ onClose, onCreated }) {
             <Input label="Question" value={question} onChange={setQuestion}
               placeholder="Will ETH be > $4000 on June 1?" required />
             <Select label="Question Type" value={qType} onChange={setQType} options={qTypeOptions} required />
-            <Select label="Price Feed" value={feed} onChange={setFeed} options={feedOptions} required />
+
+            <Select
+              label={`Price Feed (${feedOptions.length} devnet feeds)`}
+              value={feed}
+              onChange={setFeed}
+              options={feedOptions}
+              required
+              searchable
+            />
 
             {needsTarget && (
               <Input label="Target Price (USD, integer)" value={targetPrice}
@@ -937,7 +1067,6 @@ function CreatePriceMarketModal({ onClose, onCreated }) {
               <Input label="Percentage (%)" value={percentage} onChange={setPercentage}
                 placeholder="e.g. 10" type="number" required />
             )}
-
             {isRange && (
               <div>
                 <label className="block text-[10px] font-mono text-white/40 uppercase tracking-widest mb-2">
@@ -946,14 +1075,10 @@ function CreatePriceMarketModal({ onClose, onCreated }) {
                 {rangeOptions.map((ro, i) => (
                   <div key={i} className="grid grid-cols-2 gap-2 mb-2">
                     <input type="number" placeholder={`Option ${i + 1} Low`} value={ro.lower}
-                      onChange={(e) => {
-                        const n = [...rangeOptions]; n[i] = { ...n[i], lower: e.target.value }; setRangeOptions(n);
-                      }}
+                      onChange={(e) => { const n = [...rangeOptions]; n[i] = { ...n[i], lower: e.target.value }; setRangeOptions(n); }}
                       className="bg-dim border border-border rounded-xl px-3 py-2 text-white text-xs font-mono outline-none focus:border-accent/50 transition-all" />
                     <input type="number" placeholder={`Option ${i + 1} High`} value={ro.upper}
-                      onChange={(e) => {
-                        const n = [...rangeOptions]; n[i] = { ...n[i], upper: e.target.value }; setRangeOptions(n);
-                      }}
+                      onChange={(e) => { const n = [...rangeOptions]; n[i] = { ...n[i], upper: e.target.value }; setRangeOptions(n); }}
                       className="bg-dim border border-border rounded-xl px-3 py-2 text-white text-xs font-mono outline-none focus:border-accent/50 transition-all" />
                   </div>
                 ))}
@@ -966,22 +1091,31 @@ function CreatePriceMarketModal({ onClose, onCreated }) {
               </div>
             )}
 
+            {/* FIX (time ordering): Betting End left, Target Time right */}
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-mono text-white/40 uppercase tracking-widest mb-1.5">
-                  Target Time <span className="text-accent">*</span>
-                </label>
-                <input type="datetime-local" value={targetTime} onChange={(e) => setTargetTime(e.target.value)}
-                  className="w-full bg-dim border border-border rounded-xl px-3 py-2.5 text-white text-xs font-mono outline-none focus:border-accent/50 transition-all" />
-              </div>
               <div>
                 <label className="block text-[10px] font-mono text-white/40 uppercase tracking-widest mb-1.5">
                   Betting Ends <span className="text-accent">*</span>
                 </label>
                 <input type="datetime-local" value={marketEndTime} onChange={(e) => setMarketEndTime(e.target.value)}
                   className="w-full bg-dim border border-border rounded-xl px-3 py-2.5 text-white text-xs font-mono outline-none focus:border-accent/50 transition-all" />
+                <p className="text-[9px] font-mono text-white/20 mt-1">Must be before target time</p>
+              </div>
+              <div>
+                <label className="block text-[10px] font-mono text-white/40 uppercase tracking-widest mb-1.5">
+                  Target Time <span className="text-accent">*</span>
+                </label>
+                <input type="datetime-local" value={targetTime} onChange={(e) => setTargetTime(e.target.value)}
+                  className="w-full bg-dim border border-border rounded-xl px-3 py-2.5 text-white text-xs font-mono outline-none focus:border-accent/50 transition-all" />
+                <p className="text-[9px] font-mono text-white/20 mt-1">When price is checked</p>
               </div>
             </div>
+
+            {marketEndTime && targetTime && new Date(marketEndTime) >= new Date(targetTime) && (
+              <p className="text-xs font-mono text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2">
+                ⚠ Betting end must be earlier than target time
+              </p>
+            )}
 
             <ErrMsg msg={error} />
 
@@ -1009,12 +1143,9 @@ function CreatePriceMarketModal({ onClose, onCreated }) {
                   ? `$${rangeOptions[i]?.lower} – $${rangeOptions[i]?.upper}`
                   : i === 0 ? "No" : "Yes";
                 return (
-                  <div
-                    key={i}
-                    className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                      added ? "border-accent/30 bg-accent/5" : isNext ? "border-white/20 bg-white/5" : "border-border/30 bg-dim/30 opacity-40"
-                    }`}
-                  >
+                  <div key={i} className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                    added ? "border-accent/30 bg-accent/5" : isNext ? "border-white/20 bg-white/5" : "border-border/30 bg-dim/30 opacity-40"
+                  }`}>
                     <div>
                       <p className={`text-xs font-mono font-semibold ${added ? "text-accent" : "text-white/60"}`}>
                         {added ? "✓ " : ""}{optLabel}
@@ -1035,7 +1166,7 @@ function CreatePriceMarketModal({ onClose, onCreated }) {
               })}
             </div>
 
-            <ErrMsg msg={aoErr} />
+            <ErrMsg msg={aoe} />
 
             {allOptionsAdded && (
               <div className="p-3 rounded-xl border border-accent/20 bg-accent/5 text-center">
@@ -1043,12 +1174,9 @@ function CreatePriceMarketModal({ onClose, onCreated }) {
               </div>
             )}
 
-            <button
-              onClick={onClose}
-              className={`w-full py-3 rounded-xl font-mono font-bold text-sm uppercase tracking-widest transition-all ${
-                allOptionsAdded ? "bg-accent text-black hover:bg-accent/90" : "bg-white/5 text-white/40 border border-border hover:bg-white/10"
-              }`}
-            >
+            <button onClick={onClose} className={`w-full py-3 rounded-xl font-mono font-bold text-sm uppercase tracking-widest transition-all ${
+              allOptionsAdded ? "bg-accent text-black hover:bg-accent/90" : "bg-white/5 text-white/40 border border-border hover:bg-white/10"
+            }`}>
               {allOptionsAdded ? "Done" : "Close (finish later)"}
             </button>
           </div>
@@ -1058,8 +1186,11 @@ function CreatePriceMarketModal({ onClose, onCreated }) {
   );
 }
 
-// ── Create Event Market Modal ─────────────────────────────────────────────────
+// ── Create Event Market Modal ──────────────────────────────────────────────────
+// FIX (add option): addEventOption receives market.publicKey (a PublicKey).
+// FIX (time ordering): Betting End (left) < Event End (right).
 function CreateEventMarketModal({ onClose, onCreated }) {
+  const { toast } = useToast();
   const [qType, setQType] = useState("optioned");
   const [question, setQuestion] = useState("");
   const [optionNames, setOptionNames] = useState(["YES", "NO"]);
@@ -1067,36 +1198,78 @@ function CreateEventMarketModal({ onClose, onCreated }) {
   const [eventEndTime, setEventEndTime] = useState("");
   const [createdMarket, setCreatedMarket] = useState(null);
   const [optionsAdded, setOptionsAdded] = useState(0);
+  const createdMarketRef = useRef(null);
 
   const numOptions = qType === "optioned" ? optionNames.length : 2;
+  const allOptionsAdded = optionsAdded >= numOptions;
+  const displayNames = qType === "optioned" ? optionNames : ["No", "Yes"];
 
-  const { createEventMarket, loading, error } = useCreateEventMarket((result) => {
-    setCreatedMarket(result);
-    onCreated(result);
+  const program = useProgram();
+
+  const { createEventMarket, loading, error } = useCreateEventMarket(async (result) => {
+    // result = { marketPda: PublicKey, nextId: number }
+    let fullMarket = null;
+    try {
+      const acc = await program.account.eventMarket.fetch(result.marketPda);
+      fullMarket = { publicKey: result.marketPda, account: acc };
+    } catch {
+      fullMarket = { publicKey: result.marketPda, account: null };
+    }
+    setCreatedMarket(fullMarket);
+    createdMarketRef.current = fullMarket;
+    onCreated(fullMarket);
   });
 
+  // FIX (add option): addEventOption takes a PublicKey
   const { addEventOption, loading: aeol, error: aeErr } = useAddEventOption(() => {
-    onCreated(createdMarket);
+    if (createdMarketRef.current) onCreated(createdMarketRef.current);
   });
+
+  useEffect(() => { if (aeErr) toast.error(aeErr); }, [aeErr]);
 
   const submit = async () => {
-    const met = Math.floor(new Date(marketEndTime).getTime() / 1000);
-    const eet = Math.floor(new Date(eventEndTime).getTime() / 1000);
+    if (!question) { toast.error("Please enter a question"); return; }
+    if (!marketEndTime || !eventEndTime) { toast.error("Please set both end times"); return; }
+
+    // FIX (time ordering): betting end must be before event end
+    const metMs = new Date(marketEndTime).getTime();
+    const eetMs = new Date(eventEndTime).getTime();
+    if (metMs >= eetMs) {
+      toast.error("Betting end time must be earlier than the event end time");
+      return;
+    }
+
     const questionTypeObj =
       qType === "optioned"
         ? { optioned: { options: optionNames.map((n) => ({ optionName: n })) } }
         : { binary: {} };
-    await createEventMarket({ questionTypeObj, question, marketEndTime: met, eventEndTime: eet });
+
+    try {
+      await createEventMarket({
+        questionTypeObj,
+        question,
+        marketEndTime: Math.floor(metMs / 1000),
+        eventEndTime: Math.floor(eetMs / 1000),
+      });
+      toast.success("Event market created!");
+    } catch (e) {
+      toast.error(e?.message ?? "Failed to create event market");
+    }
   };
 
   const handleAddOption = async () => {
-    if (!createdMarket) return;
-    await addEventOption(createdMarket.publicKey ?? createdMarket);
-    setOptionsAdded((n) => n + 1);
+    const mkt = createdMarketRef.current;
+    if (!mkt?.publicKey) { toast.error("Market not ready — please try again"); return; }
+    try {
+      // FIX (add option): pass PublicKey directly — matches useAddEventOption signature
+      await addEventOption(mkt.publicKey);
+      setOptionsAdded((n) => n + 1);
+      toast.success(`Option ${optionsAdded + 1} added`);
+      if (createdMarketRef.current) onCreated(createdMarketRef.current);
+    } catch (e) {
+      toast.error(e?.message ?? "Failed to add option");
+    }
   };
-
-  const allOptionsAdded = optionsAdded >= numOptions;
-  const displayNames = qType === "optioned" ? optionNames : ["No", "Yes"];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8 overflow-y-auto">
@@ -1129,9 +1302,7 @@ function CreateEventMarketModal({ onClose, onCreated }) {
                 {optionNames.map((name, i) => (
                   <div key={i} className="flex items-center gap-2 mb-2">
                     <input value={name}
-                      onChange={(e) => {
-                        const n = [...optionNames]; n[i] = e.target.value; setOptionNames(n);
-                      }}
+                      onChange={(e) => { const n = [...optionNames]; n[i] = e.target.value; setOptionNames(n); }}
                       placeholder={`Option ${i + 1}`}
                       className="flex-1 bg-dim border border-border rounded-xl px-3 py-2 text-white text-sm font-mono outline-none focus:border-gold/50 transition-all" />
                     {optionNames.length > 2 && (
@@ -1149,6 +1320,7 @@ function CreateEventMarketModal({ onClose, onCreated }) {
               </div>
             )}
 
+            {/* FIX (time ordering): Betting End left, Event End right */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-[10px] font-mono text-white/40 uppercase tracking-widest mb-1.5">
@@ -1156,6 +1328,7 @@ function CreateEventMarketModal({ onClose, onCreated }) {
                 </label>
                 <input type="datetime-local" value={marketEndTime} onChange={(e) => setMarketEndTime(e.target.value)}
                   className="w-full bg-dim border border-border rounded-xl px-3 py-2.5 text-white text-xs font-mono outline-none focus:border-gold/50 transition-all" />
+                <p className="text-[9px] font-mono text-white/20 mt-1">Must be before event end</p>
               </div>
               <div>
                 <label className="block text-[10px] font-mono text-white/40 uppercase tracking-widest mb-1.5">
@@ -1163,8 +1336,15 @@ function CreateEventMarketModal({ onClose, onCreated }) {
                 </label>
                 <input type="datetime-local" value={eventEndTime} onChange={(e) => setEventEndTime(e.target.value)}
                   className="w-full bg-dim border border-border rounded-xl px-3 py-2.5 text-white text-xs font-mono outline-none focus:border-gold/50 transition-all" />
+                <p className="text-[9px] font-mono text-white/20 mt-1">When event resolves</p>
               </div>
             </div>
+
+            {marketEndTime && eventEndTime && new Date(marketEndTime) >= new Date(eventEndTime) && (
+              <p className="text-xs font-mono text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2">
+                ⚠ Betting end must be earlier than event end time
+              </p>
+            )}
 
             <ErrMsg msg={error} />
 
@@ -1189,12 +1369,9 @@ function CreateEventMarketModal({ onClose, onCreated }) {
                 const added = i < optionsAdded;
                 const isNext = i === optionsAdded;
                 return (
-                  <div
-                    key={i}
-                    className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                      added ? "border-gold/30 bg-gold/5" : isNext ? "border-white/20 bg-white/5" : "border-border/30 bg-dim/30 opacity-40"
-                    }`}
-                  >
+                  <div key={i} className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                    added ? "border-gold/30 bg-gold/5" : isNext ? "border-white/20 bg-white/5" : "border-border/30 bg-dim/30 opacity-40"
+                  }`}>
                     <div>
                       <p className={`text-xs font-mono font-semibold ${added ? "text-gold" : "text-white/60"}`}>
                         {added ? "✓ " : ""}{displayNames[i] || `Option ${i + 1}`}
@@ -1223,12 +1400,9 @@ function CreateEventMarketModal({ onClose, onCreated }) {
               </div>
             )}
 
-            <button
-              onClick={onClose}
-              className={`w-full py-3 rounded-xl font-mono font-bold text-sm uppercase tracking-widest transition-all ${
-                allOptionsAdded ? "bg-gold text-black hover:bg-gold/90" : "bg-white/5 text-white/40 border border-border hover:bg-white/10"
-              }`}
-            >
+            <button onClick={onClose} className={`w-full py-3 rounded-xl font-mono font-bold text-sm uppercase tracking-widest transition-all ${
+              allOptionsAdded ? "bg-gold text-black hover:bg-gold/90" : "bg-white/5 text-white/40 border border-border hover:bg-white/10"
+            }`}>
               {allOptionsAdded ? "Done" : "Close (finish later)"}
             </button>
           </div>
@@ -1244,10 +1418,10 @@ function ProfileTab({ userAccount, priceMarkets, eventMarkets, myOrders, onRefre
   const [subTab, setSubTab] = useState("orders");
 
   const myPriceMarkets = priceMarkets.filter(
-    (m) => m.account.authority.toBase58() === publicKey?.toBase58()
+    (m) => publicKey != null && m.account.authority?.toBase58() === publicKey.toBase58()
   );
   const myEventMarkets = eventMarkets.filter(
-    (m) => m.account.authority.toBase58() === publicKey?.toBase58()
+    (m) => publicKey != null && m.account.authority?.toBase58() === publicKey.toBase58()
   );
 
   const data = userAccount?.data;
@@ -1278,12 +1452,8 @@ function ProfileTab({ userAccount, priceMarkets, eventMarkets, myOrders, onRefre
               subTab === t ? "bg-accent text-black" : "text-white/40 hover:text-white"
             }`}>
             {t}
-            {t === "orders" && (
-              <span className="ml-1.5 text-[9px] opacity-60">{myOrders.length}</span>
-            )}
-            {t === "my markets" && (
-              <span className="ml-1.5 text-[9px] opacity-60">{myPriceMarkets.length + myEventMarkets.length}</span>
-            )}
+            {t === "orders" && <span className="ml-1.5 text-[9px] opacity-60">{myOrders.length}</span>}
+            {t === "my markets" && <span className="ml-1.5 text-[9px] opacity-60">{myPriceMarkets.length + myEventMarkets.length}</span>}
           </button>
         ))}
       </div>
@@ -1297,9 +1467,7 @@ function ProfileTab({ userAccount, priceMarkets, eventMarkets, myOrders, onRefre
               const mkt = [...priceMarkets, ...eventMarkets].find(
                 (m) => m.publicKey.toBase58() === o.account.market.toBase58()
               );
-              const isEvent = eventMarkets.some(
-                (m) => m.publicKey.toBase58() === o.account.market.toBase58()
-              );
+              const isEvent = eventMarkets.some((m) => m.publicKey.toBase58() === o.account.market.toBase58());
               const optLabel = mkt
                 ? getOptionLabel(o.account.option, mkt.account, isEvent)
                 : `Option ${o.account.option + 1}`;
@@ -1343,24 +1511,12 @@ function ProfileTab({ userAccount, priceMarkets, eventMarkets, myOrders, onRefre
           ) : (
             <>
               {myPriceMarkets.map((m) => (
-                <MarketCard
-                  key={m.publicKey.toBase58()}
-                  market={m}
-                  isEvent={false}
-                  myOrders={myOrders}
-                  onRefreshSingle={(pk) => onRefreshSingle(pk, false)}
-                  isMyMarket={true}
-                />
+                <MarketCard key={m.publicKey.toBase58()} market={m} isEvent={false}
+                  myOrders={myOrders} onRefreshSingle={(pk) => onRefreshSingle(pk, false)} isMyMarket={true} />
               ))}
               {myEventMarkets.map((m) => (
-                <MarketCard
-                  key={m.publicKey.toBase58()}
-                  market={m}
-                  isEvent={true}
-                  myOrders={myOrders}
-                  onRefreshSingle={(pk) => onRefreshSingle(pk, true)}
-                  isMyMarket={true}
-                />
+                <MarketCard key={m.publicKey.toBase58()} market={m} isEvent={true}
+                  myOrders={myOrders} onRefreshSingle={(pk) => onRefreshSingle(pk, true)} isMyMarket={true} />
               ))}
             </>
           )}
@@ -1370,23 +1526,55 @@ function ProfileTab({ userAccount, priceMarkets, eventMarkets, myOrders, onRefre
   );
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
-export default function PredictionMarketPlace() {
+// ── Auth Gate ─────────────────────────────────────────────────────────────────
+function AuthGate() {
+  return (
+    <div className="relative min-h-screen grid-bg flex items-center justify-center px-6">
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] rounded-full bg-accent/5 blur-[180px] pointer-events-none" />
+      <div className="relative z-10 text-center max-w-md">
+        <div className="mb-8">
+          <span className="text-[10px] font-mono text-accent uppercase tracking-[0.3em] block mb-3">OracleX</span>
+          <h1 className="font-display text-5xl tracking-widest text-white mb-3">
+            PREDICTION <span className="text-accent">MARKETS</span>
+          </h1>
+          <p className="text-white/30 text-xs font-mono leading-relaxed">
+            Decentralized prediction markets on Solana.<br />Connect your wallet to participate.
+          </p>
+        </div>
+        <div className="p-8 rounded-2xl border border-border bg-panel/80 backdrop-blur-sm">
+          <div className="w-14 h-14 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center mx-auto mb-5">
+            <span className="text-2xl">🔐</span>
+          </div>
+          <h2 className="font-mono text-sm font-semibold text-white mb-2 uppercase tracking-widest">Wallet Required</h2>
+          <p className="text-white/30 text-xs font-mono mb-6 leading-relaxed">
+            Connect a Solana wallet to browse markets, place bets, and claim rewards.
+          </p>
+          <a href="/" className="block w-full py-3 rounded-xl bg-white/5 border border-border text-white/50 hover:text-white hover:border-accent/30 hover:bg-accent/5 font-mono font-semibold text-xs uppercase tracking-widest transition-all text-center">
+            ← Go Back to Home
+          </a>
+          <p className="text-[10px] font-mono text-white/20 mt-4">Use the wallet button in the navigation to connect.</p>
+        </div>
+        <p className="text-[10px] font-mono text-white/15 mt-6">Devnet • OracleX v1</p>
+      </div>
+    </div>
+  );
+}
+
+// ── Inner page ────────────────────────────────────────────────────────────────
+function PredictionMarketPlaceInner() {
   const { publicKey } = useWallet();
+  const { toast } = useToast();
   const { status, userAccount } = useCheckUser();
   const {
-    priceMarkets,
-    eventMarkets,
-    loading,
-    error,
-    refresh,
-    refreshSinglePriceMarket,
-    refreshSingleEventMarket,
+    priceMarkets, eventMarkets, loading, error,
+    refresh, refreshSinglePriceMarket, refreshSingleEventMarket,
   } = useMarkets();
   const { myOrders } = useMyOrders();
-
-  // ── Fetch DAO total stake for quorum checks ──────────────────────────────
   const daoTotalStake = useDaoTotalStake();
+
+  useEffect(() => {
+    if (error) toast.error(`Failed to load markets: ${error}`);
+  }, [error]);
 
   const [mainTab, setMainTab] = useState("markets");
   const [marketCat, setMarketCat] = useState("all");
@@ -1396,74 +1584,64 @@ export default function PredictionMarketPlace() {
 
   const refreshSingle = useCallback(
     (marketPubkey, isEvent) => {
-      if (isEvent) {
-        refreshSingleEventMarket(marketPubkey);
-      } else {
-        refreshSinglePriceMarket(marketPubkey);
-      }
+      if (isEvent) refreshSingleEventMarket(marketPubkey);
+      else refreshSinglePriceMarket(marketPubkey);
     },
     [refreshSinglePriceMarket, refreshSingleEventMarket]
   );
 
-  const filteredPriceMarkets = useMemo(() => {
-    return priceMarkets.filter((m) =>
-      statusFilter === "active" ? !m.account.resolved : m.account.resolved
-    );
-  }, [priceMarkets, statusFilter]);
-
-  const filteredEventMarkets = useMemo(() => {
-    return eventMarkets.filter((m) =>
-      statusFilter === "active" ? !m.account.resolved : m.account.resolved
-    );
-  }, [eventMarkets, statusFilter]);
+  const filteredPriceMarkets = useMemo(() =>
+    priceMarkets.filter((m) => statusFilter === "active" ? !m.account.resolved : m.account.resolved),
+    [priceMarkets, statusFilter]
+  );
+  const filteredEventMarkets = useMemo(() =>
+    eventMarkets.filter((m) => statusFilter === "active" ? !m.account.resolved : m.account.resolved),
+    [eventMarkets, statusFilter]
+  );
 
   const showPrice = marketCat === "all" || marketCat === "price";
   const showEvent = marketCat === "all" || marketCat === "event";
 
-  const totalActive =
+  const totalActive = useMemo(() =>
     priceMarkets.filter((m) => !m.account.resolved).length +
-    eventMarkets.filter((m) => !m.account.resolved).length;
+    eventMarkets.filter((m) => !m.account.resolved).length,
+    [priceMarkets, eventMarkets]
+  );
 
-  const handlePriceMarketCreated = useCallback(() => { refresh(); }, [refresh]);
-  const handleEventMarketCreated = useCallback(() => { refresh(); }, [refresh]);
+  const handlePriceMarketCreated = useCallback(() => refresh(), [refresh]);
+  const handleEventMarketCreated = useCallback(() => refresh(), [refresh]);
+
+  if (!publicKey) return <AuthGate />;
 
   return (
     <div className="relative min-h-screen grid-bg">
       <div className="absolute top-0 right-1/4 w-[500px] h-[300px] rounded-full bg-accent/3 blur-[160px] pointer-events-none" />
 
       <div className="relative z-10 max-w-5xl mx-auto px-6 py-10">
-        {/* ── Header ── */}
         <div className="flex items-start justify-between gap-4 mb-8 flex-wrap">
           <div>
-            <span className="text-[10px] font-mono text-accent uppercase tracking-[0.2em] block mb-1">
-              OracleX
-            </span>
+            <span className="text-[10px] font-mono text-accent uppercase tracking-[0.2em] block mb-1">OracleX</span>
             <h1 className="font-display text-4xl tracking-widest text-white">
               PREDICTION <span className="text-accent">MARKETS</span>
             </h1>
             <p className="text-white/30 text-xs font-mono mt-1">
-              {totalActive} active markets • Devnet
+              {totalActive} active markets • Devnet •
+              <span className="ml-1 text-accent/40">{Object.keys(PYTH_FEED_SYMBOLS).length} Pyth feeds</span>
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={refresh}
-              className="px-3 py-2 rounded-xl border border-border bg-panel hover:border-accent/30 text-white/40 hover:text-white transition-all text-xs font-mono"
-            >
+            <button onClick={refresh}
+              className="px-3 py-2 rounded-xl border border-border bg-panel hover:border-accent/30 text-white/40 hover:text-white transition-all text-xs font-mono">
               ↻
             </button>
             {(status === "normal" || status === "dao") && (
               <>
-                <button
-                  onClick={() => setShowCreatePrice(true)}
-                  className="px-4 py-2 rounded-xl bg-accent/10 border border-accent/30 text-accent hover:bg-accent hover:text-black transition-all text-xs font-mono font-semibold"
-                >
+                <button onClick={() => setShowCreatePrice(true)}
+                  className="px-4 py-2 rounded-xl bg-accent/10 border border-accent/30 text-accent hover:bg-accent hover:text-black transition-all text-xs font-mono font-semibold">
                   + Price Market
                 </button>
-                <button
-                  onClick={() => setShowCreateEvent(true)}
-                  className="px-4 py-2 rounded-xl bg-gold/10 border border-gold/30 text-gold hover:bg-gold hover:text-black transition-all text-xs font-mono font-semibold"
-                >
+                <button onClick={() => setShowCreateEvent(true)}
+                  className="px-4 py-2 rounded-xl bg-gold/10 border border-gold/30 text-gold hover:bg-gold hover:text-black transition-all text-xs font-mono font-semibold">
                   + Event Market
                 </button>
               </>
@@ -1471,16 +1649,9 @@ export default function PredictionMarketPlace() {
           </div>
         </div>
 
-        {/* ── Main tabs ── */}
         <div className="flex gap-1 mb-8 p-1 rounded-xl bg-dim border border-border w-fit">
-          <Pill active={mainTab === "markets"} onClick={() => setMainTab("markets")}>
-            Markets
-          </Pill>
-          {publicKey && (
-            <Pill active={mainTab === "profile"} onClick={() => setMainTab("profile")}>
-              My Profile
-            </Pill>
-          )}
+          <Pill active={mainTab === "markets"} onClick={() => setMainTab("markets")}>Markets</Pill>
+          <Pill active={mainTab === "profile"} onClick={() => setMainTab("profile")}>My Profile</Pill>
         </div>
 
         {mainTab === "profile" ? (
@@ -1494,14 +1665,9 @@ export default function PredictionMarketPlace() {
           />
         ) : (
           <>
-            {/* ── Filters ── */}
             <div className="flex items-center gap-3 mb-6 flex-wrap">
               <div className="flex gap-1 p-1 rounded-xl bg-dim border border-border">
-                {[
-                  { v: "all", l: "All" },
-                  { v: "price", l: "Token Price" },
-                  { v: "event", l: "Events" },
-                ].map(({ v, l }) => (
+                {[{ v: "all", l: "All" }, { v: "price", l: "Token Price" }, { v: "event", l: "Events" }].map(({ v, l }) => (
                   <button key={v} onClick={() => setMarketCat(v)}
                     className={`px-4 py-1.5 rounded-lg text-[11px] font-mono font-semibold uppercase tracking-wider transition-all ${
                       marketCat === v ? "bg-white/15 text-white" : "text-white/30 hover:text-white"
@@ -1511,10 +1677,7 @@ export default function PredictionMarketPlace() {
                 ))}
               </div>
               <div className="flex gap-1 p-1 rounded-xl bg-dim border border-border">
-                {[
-                  { v: "active", l: "Active" },
-                  { v: "resolved", l: "Resolved" },
-                ].map(({ v, l }) => (
+                {[{ v: "active", l: "Active" }, { v: "resolved", l: "Resolved" }].map(({ v, l }) => (
                   <button key={v} onClick={() => setStatusFilter(v)}
                     className={`px-4 py-1.5 rounded-lg text-[11px] font-mono font-semibold uppercase tracking-wider transition-all ${
                       statusFilter === v
@@ -1530,7 +1693,6 @@ export default function PredictionMarketPlace() {
               </span>
             </div>
 
-            {/* ── Market grid ── */}
             {loading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-52" />)}
@@ -1538,39 +1700,28 @@ export default function PredictionMarketPlace() {
             ) : error ? (
               <div className="py-16 text-center">
                 <p className="text-red-400 font-mono text-sm">{error}</p>
+                <button onClick={refresh} className="mt-4 px-4 py-2 rounded-xl border border-border text-white/30 hover:text-white text-xs font-mono transition-all">
+                  ↻ Retry
+                </button>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {showPrice &&
-                  filteredPriceMarkets.map((m) => (
-                    <MarketCard
-                      key={m.publicKey.toBase58()}
-                      market={m}
-                      isEvent={false}
-                      myOrders={myOrders}
-                      daoTotalStake={daoTotalStake}
-                      onRefreshSingle={(pk) => refreshSingle(pk, false)}
-                      isMyMarket={
-                        publicKey &&
-                        m.account.authority.toBase58() === publicKey.toBase58()
-                      }
-                    />
-                  ))}
-                {showEvent &&
-                  filteredEventMarkets.map((m) => (
-                    <MarketCard
-                      key={m.publicKey.toBase58()}
-                      market={m}
-                      isEvent={true}
-                      myOrders={myOrders}
-                      daoTotalStake={daoTotalStake}
-                      onRefreshSingle={(pk) => refreshSingle(pk, true)}
-                      isMyMarket={
-                        publicKey &&
-                        m.account.authority.toBase58() === publicKey.toBase58()
-                      }
-                    />
-                  ))}
+                {showPrice && filteredPriceMarkets.map((m) => (
+                  <MarketCard
+                    key={m.publicKey.toBase58()} market={m} isEvent={false}
+                    myOrders={myOrders} daoTotalStake={daoTotalStake}
+                    onRefreshSingle={(pk) => refreshSingle(pk, false)}
+                    isMyMarket={publicKey != null && m.account.authority?.toBase58() === publicKey.toBase58()}
+                  />
+                ))}
+                {showEvent && filteredEventMarkets.map((m) => (
+                  <MarketCard
+                    key={m.publicKey.toBase58()} market={m} isEvent={true}
+                    myOrders={myOrders} daoTotalStake={daoTotalStake}
+                    onRefreshSingle={(pk) => refreshSingle(pk, true)}
+                    isMyMarket={publicKey != null && m.account.authority?.toBase58() === publicKey.toBase58()}
+                  />
+                ))}
                 {(showPrice ? filteredPriceMarkets : []).length === 0 &&
                   (showEvent ? filteredEventMarkets : []).length === 0 && (
                     <div className="col-span-2 py-16 text-center">
@@ -1598,5 +1749,14 @@ export default function PredictionMarketPlace() {
         />
       )}
     </div>
+  );
+}
+
+// ── Main export ───────────────────────────────────────────────────────────────
+export default function PredictionMarketPlace() {
+  return (
+    <ToastProvider>
+      <PredictionMarketPlaceInner />
+    </ToastProvider>
   );
 }

@@ -24,13 +24,7 @@ export default function Navbar() {
           </span>
         </Link>
 
-        <div className="hidden md:flex items-center gap-8">
-          {[{ label: "Markets", href: "/" }, { label: "DAO", href: "/dao" }].map(({ label, href }) => (
-            <Link key={href} to={href} className={`text-sm font-medium transition-colors duration-200 ${location.pathname === href ? "text-accent" : "text-muted hover:text-white"}`}>
-              {label}
-            </Link>
-          ))}
-        </div>
+
 
         <div className="flex items-center gap-3">
           {connected && publicKey && (

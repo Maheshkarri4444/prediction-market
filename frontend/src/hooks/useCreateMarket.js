@@ -148,7 +148,6 @@ export function useCreatePriceMarket(onSuccess) {
     } catch (err) {
       console.error("createMarket:", err);
       setError(err?.message ?? "Create market failed");
-      return null;
     } finally {
       setLoading(false);
     }
@@ -251,7 +250,6 @@ export function useCreateEventMarket(onSuccess) {
     } catch (err) {
       console.error("createEventMarket:", err);
       setError(err?.message ?? "Create event market failed");
-      return null;
     } finally {
       setLoading(false);
     }
@@ -288,6 +286,7 @@ export function useAddEventOption(onSuccess) {
     } catch (err) {
       console.error("addEventOption:", err);
       setError(err?.message ?? "Add event option failed");
+
     } finally {
       setLoading(false);
     }

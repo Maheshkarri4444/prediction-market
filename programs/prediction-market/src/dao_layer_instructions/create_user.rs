@@ -244,6 +244,7 @@ pub fn dao_user_stake(ctx: Context<DaoUserStake>, amount: u64)-> Result<()> {
     dao_user.free_amount += amount as u64;
 
     dao.dao_total_stake += amount as u64;
+    dao_user.reputation += 5 as u64;
 
     Ok(())
 }
@@ -304,7 +305,9 @@ pub fn dao_user_unstake(ctx:Context<DaoUserUnstake> ,  amount: u64) -> Result<()
 
     dao_user.total_stake -= amount as u64;
     dao_user.free_amount -= amount as u64;
-
+    if dao_user.reputation != 0 as u64 {
+        dao_user.reputation -= 1 as u64;
+    }
     dao.dao_total_stake -= amount as u64;
 
     Ok(())

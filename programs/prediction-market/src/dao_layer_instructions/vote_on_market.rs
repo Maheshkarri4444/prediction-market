@@ -74,5 +74,7 @@ pub fn vote_on_market(ctx:Context<VoteOnMarket> , option_id: u8 , stake: u64)->R
     dao_user.locked_amount += stake as u64;
     dao_user.free_amount -= stake as u64;
 
+    dao_user.reputation += 1 as u64;
+
     Ok(())
 }

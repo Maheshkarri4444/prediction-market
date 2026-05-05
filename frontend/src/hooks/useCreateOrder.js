@@ -115,7 +115,9 @@ export function useCreateOrder(onSuccess) {
       onSuccess?.();
     } catch (err) {
       console.error("createOrder:", err);
-      setError(err?.message ?? "Order failed");
+      setError(err?.error?.errorMessage ?? "Order failed");
+      console.log("Error details:", err);
+      console.log("error:" , err.error);
     } finally {
       setLoading(false);
     }

@@ -87,12 +87,16 @@ pub fn claim_stake(ctx: Context<ClaimStake>) -> Result<()> {
         dao_user.total_stake += total_reward as u64;
         dao_user.locked_amount -= voter_stake as u64;
         dao_user.free_amount += total_reward as u64;
+        dao_user.reputation += 10 as u64;
 
         vote.stake_claimed = true;
     } else {
         // false contribution
         dao_user.total_stake -= voter_stake as u64;
         dao_user.locked_amount -= voter_stake as u64;
+        if dao_user.reputation != 0 as u64 {
+            dao_user.reputation -= 1 as u64;
+        }
 
         vote.stake_claimed = true;
     }

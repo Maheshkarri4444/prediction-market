@@ -66,25 +66,7 @@ export default function MarketplaceStats() {
           </div>
         )}
       </div>
-      {dao && (
-        <div className="mt-4 p-5 rounded-2xl bg-panel border border-border">
-          <p className="text-xs font-mono text-white/80 uppercase tracking-widest mb-3">DAO Details</p>
-          <div className="flex flex-wrap gap-6 text-sm">
-            <div>
-              <p className="text-white/80 text-xs mb-0.5">Creator</p>
-              <p className="font-mono text-white">{shortenAddress(dao.creator?.toBase58(), 6)}</p>
-            </div>
-            <div>
-              <p className="text-white/80 text-xs mb-0.5">Total Stake</p>
-              <p className="font-mono text-accent">{formatSOL(dao.daoTotalStake?.toNumber())} SOL</p>
-            </div>
-            <div>
-              <p className="text-white/80 text-xs mb-0.5">Members</p>
-              <p className="font-mono text-white">{dao.totalMembers?.toString() ?? "—"}</p>
-            </div>
-          </div>
-        </div>
-      )}
+
       <div className="glow-line mt-8" />
     </section>
   );
