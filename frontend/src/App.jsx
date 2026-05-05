@@ -15,6 +15,7 @@ import RegisterNormalUser from "./pages/RegisterNormalUser";
 import RegisterDaoUser from "./pages/RegisterDaoUser";
 import PredictionMarketPlace from "./pages/PredictionMarketPlace";
 import DaoDashboard from "./pages/DaoDashboard";
+import NotFound from "./pages/NotFound";
 
 export default function App() {
   const network = WalletAdapterNetwork.Devnet;
@@ -36,6 +37,7 @@ export default function App() {
                   <Route path="/register/dao" element={<RegisterDaoUser />} />
                   <Route path="/marketplace" element={<PredictionMarketPlace />} />
                   <Route path="/dao" element={<DaoDashboard />} />
+                  <Route path="*" element={<NotFound />} />
                 </Routes>
               </main>
               <Footer />
