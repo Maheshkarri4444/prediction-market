@@ -15,7 +15,8 @@ From a development perspective, this project significantly deepened my understan
 - Solana account model and PDA design  
 - Secure fund handling and lamports management  
 - Anchor framework and instruction architecture  
-- Oracle integration (Pyth) and deterministic resolution  
+- Oracle integration (Pyth) and deterministic resolution
+- Dealing with Dao and prediction marketplace logic. 
 - Designing incentive-compatible systems (staking, slashing, rewards)  
 - Building full-stack dApps with real-time state synchronization  
 
