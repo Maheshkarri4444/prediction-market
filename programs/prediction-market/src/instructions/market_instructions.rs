@@ -436,28 +436,23 @@ pub fn resolve_market(ctx: Context<ResolveMarket>) -> Result<()> {
         }
     };
     msg!("Outcome: {}", outcome);
-
     {
-        let prediction_market_key = prediction_market.key();
-        let signer_seeds: &[&[&[u8]]] = &[&[
-            b"predictionmarketplace_vault",
-            prediction_market_key.as_ref(),
-            &[prediction_market.vault_bump],
-        ]];
         let prediction_vault_info = prediction_market_vault.to_account_info();
         let resolver_info = ctx.accounts.resolver.to_account_info();
 
-        transfer(
-            CpiContext::new_with_signer(
-                ctx.accounts.system_program.to_account_info(),
-                Transfer {
-                    from: prediction_vault_info,
-                    to: resolver_info,
-                },
-                signer_seeds,
-            ),
-            RESOLVE_REWARD,
-        )?;
+        // borrow lamports
+        let mut vault_lamports = prediction_vault_info.try_borrow_mut_lamports()?;
+        let mut resolver_lamports = resolver_info.try_borrow_mut_lamports()?;
+
+        // subtract from vault
+        **vault_lamports = (**vault_lamports)
+            .checked_sub(RESOLVE_REWARD)
+            .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
+
+        // add to resolver
+        **resolver_lamports = (**resolver_lamports)
+            .checked_add(RESOLVE_REWARD)
+            .ok_or(PredictionMarketPlaceErrors::MathOverflow)?;
     }
 
     market.final_outcome = Some(outcome);

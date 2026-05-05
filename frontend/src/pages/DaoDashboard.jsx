@@ -101,6 +101,16 @@ const timeLeft = (tsBn) => {
   }
 };
 
+// ── NEW: returns true if the eventEndTime timestamp has passed ──
+const isEventEnded = (tsBn) => {
+  try {
+    const ts = BigInt(tsBn.toString()) * 1000n;
+    return BigInt(Date.now()) >= ts;
+  } catch {
+    return false;
+  }
+};
+
 function getEventOptionLabel(index, marketAccount) {
   const qt = marketAccount?.questionType ?? marketAccount?.question_type;
   if (qt && "optioned" in qt) {
@@ -383,7 +393,8 @@ function Spinner() {
 // ─────────────────────────────────────────────────────────────────────────────
 // VoteModal
 // ─────────────────────────────────────────────────────────────────────────────
-function VoteModal({ market, onClose, onMarketRefresh, onToast }) {
+// ── CHANGE 1: accepts onVoteSuccess callback to notify parent immediately ──
+function VoteModal({ market, onClose, onMarketRefresh, onToast, onVoteSuccess }) {
   const [optionIdx, setOptionIdx] = useState(null);
   const [amount, setAmount] = useState("");
   const inFlightRef = useRef(false);
@@ -391,6 +402,9 @@ function VoteModal({ market, onClose, onMarketRefresh, onToast }) {
   const { vote, voting, error, setError } = useVote(() => {
     onMarketRefresh(market.publicKey);
     onToast("Vote submitted successfully!", "success");
+    // Notify parent with the market key and chosen option so it can
+    // update optimistic state before the async refresh completes.
+    onVoteSuccess?.(market.publicKey.toBase58(), optionIdx);
     onClose();
   });
 
@@ -521,6 +535,13 @@ function EventMarketCard({ market, myVote, onVote }) {
       : null;
 
   const alreadyVoted = !!myVote;
+  console.log("account",acc);
+  const eventEndTimeBn = acc.eventEndTime ;
+  console.log("eventEndTimeBn", eventEndTimeBn);
+  const eventEnded =isEventEnded(eventEndTimeBn) ;
+  // Vote button is visible only when: not resolved AND event time not yet passed
+  console.log("eventEnded", eventEnded);
+  const canVote = !resolved && eventEnded;
 
   return (
     <div
@@ -590,7 +611,8 @@ function EventMarketCard({ market, myVote, onVote }) {
         <span className="text-[10px] font-mono text-white/25">
           Pool: {(totalPool / 1_000_000_000).toFixed(4)} SOL
         </span>
-        {!resolved &&
+        {/* ── CHANGE 2 applied: use canVote instead of just !resolved ── */}
+        {canVote &&
           (alreadyVoted ? (
             <span className="text-[10px] font-mono text-gold/60">✓ Voted</span>
           ) : (
@@ -931,6 +953,25 @@ export default function DaoDashboard() {
   const [voteTarget, setVoteTarget] = useState(null);
   const [activeTab, setActiveTab] = useState("active");
 
+  // ── CHANGE 1: optimistic votes — keyed by market pubkey string ──
+  // Immediately reflects a cast vote so the card updates without waiting
+  // for the async refreshVote to complete.
+  const [optimisticVotes, setOptimisticVotes] = useState({});
+
+  const handleVoteSuccess = useCallback((marketKeyStr, optionIdx) => {
+    setOptimisticVotes((prev) => ({
+      ...prev,
+      [marketKeyStr]: { optionId: optionIdx },
+    }));
+  }, []);
+
+  // Merge server myVotes with optimistic overrides (optimistic takes precedence
+  // until the server state catches up, at which point they agree anyway).
+  const mergedMyVotes = useMemo(
+    () => ({ ...myVotes, ...optimisticVotes }),
+    [myVotes, optimisticVotes]
+  );
+
   const handleMarketRefresh = useCallback(
     (marketPk) => { refreshMarket?.(marketPk); },
     [refreshMarket]
@@ -1173,7 +1214,7 @@ export default function DaoDashboard() {
                 <EventMarketCard
                   key={m.publicKey.toBase58()}
                   market={m}
-                  myVote={myVotes?.[m.publicKey.toBase58()] ?? null}
+                  myVote={mergedMyVotes?.[m.publicKey.toBase58()] ?? null}
                   onVote={daoUser ? setVoteTarget : null}
                 />
               ))}
@@ -1189,6 +1230,7 @@ export default function DaoDashboard() {
           onClose={() => setVoteTarget(null)}
           onMarketRefresh={handleMarketRefresh}
           onToast={addToast}
+          onVoteSuccess={handleVoteSuccess}
         />
       )}
     </div>

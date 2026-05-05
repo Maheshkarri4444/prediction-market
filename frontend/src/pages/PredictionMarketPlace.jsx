@@ -854,7 +854,6 @@ function ClaimCard({ position, onSuccess }) {
           <p className="text-xs font-mono text-white/70 line-clamp-2 mb-1">{acc.question}</p>
           <div className="flex items-center gap-4 text-[10px] font-mono text-white/30">
             <span>Option: <span className={isWinner ? "text-accent" : "text-white/50"}>{label}</span></span>
-            <span>Balance: <span className="text-white/60">{(tokenBalance / 1e6).toFixed(2)} tokens</span></span>
           </div>
         </div>
         <div className="flex-shrink-0">
